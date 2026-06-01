@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { env } from '../../../config/env';
-import { logger } from '../../../lib/logger/pino';
-import { UpdateRepository } from '../../../repositories/UpdateRepository';
-import { TelegramUpdate } from '../../../domain/types/telegram';
-import { UpdateDispatcher } from '../../../lib/telegram/UpdateDispatcher';
+import { env } from '../../../../config/env';
+import { logger } from '../../../../lib/logger/pino';
+import { UpdateRepository } from '../../../../repositories/UpdateRepository';
+import { TelegramUpdate } from '../../../../domain/types/telegram';
+import { UpdateDispatcher } from '../../../../lib/telegram/UpdateDispatcher';
 
 const updateRepo = new UpdateRepository();
 const dispatcher = new UpdateDispatcher();

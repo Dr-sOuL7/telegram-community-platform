@@ -1,8 +1,8 @@
-import { prisma } from '../../db/prisma';
-import { IModerationService } from '../../domain/interfaces/IModerationService';
-import { TelegramClient } from '../../lib/telegram/TelegramClient';
+import { prisma } from '../db/prisma';
+import { IModerationService } from '../domain/interfaces/IModerationService';
+import { TelegramClient } from '../lib/telegram/TelegramClient';
 import { User, Group, EventType, ModerationActionType } from '@prisma/client';
-import { logger } from '../../lib/logger/pino';
+import { logger } from '../lib/logger/pino';
 
 export class ModerationService implements IModerationService {
   constructor(private telegram: TelegramClient) {}
