@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI-Powered Telegram Community Intelligence Platform
 
-## Getting Started
+## Overview
+A production-grade, Next.js App Router-based Telegram backend for managing communities. Built for scale, it handles rate limiting, idempotency, strict dependency injection, and clean architecture patterns to act as a SaaS foundation rather than a simple script bot.
 
-First, run the development server:
+## Architecture Highlights
+- **Event-Driven**: All activities log to an `EventLog` table for future analytics.
+- **Strict Idempotency**: Webhook processes deduplicate Telegram's `update_id`.
+- **Database Safety**: Prisma `$transaction` scopes used for all state mutations.
+- **Rate Limiting**: Custom queuing mechanism respects Telegram's API constraints.
+- **Correlation IDs**: `X-Request-ID` tracing across API and Pino logs.
+- **CI/CD Pipeline**: GitHub Actions strictly enforces linting and typing prior to deployment.
 
+## Tech Stack
+- Next.js (App Router)
+- TypeScript
+- Supabase (PostgreSQL)
+- Prisma ORM
+- Zod (Validation)
+- Pino (Structured Logging)
+
+## Setup Instructions
+
+### 1. Local Environment
+Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy the example environment variables:
+```bash
+cp .env.example .env
+```
+Ensure you set your `DATABASE_URL` to a valid Postgres database (like Supabase).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Database
+Run Prisma migrations:
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Telegram Webhook Setup
+Since we use push-based webhooks, Telegram needs a public URL. In development, use `ngrok`:
+```bash
+ngrok http 3000
+```
+Then register the webhook with Telegram:
+```bash
+curl -F "url=https://YOUR_NGROK_URL/api/v1/webhook" \
+     -F "secret_token=your_super_secret_webhook_token" \
+     https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook
+```
 
-## Learn More
+### 4. Running the Project
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment (Vercel)
+1. Push to GitHub.
+2. Import project in Vercel.
+3. Add environment variables.
+4. Set the Telegram webhook to your production `APP_URL`.

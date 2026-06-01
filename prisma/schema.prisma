@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------
+// ENUMS
+// ---------------------------------------------------------
+
+enum ModerationActionType {
+  WARN
+  UNWARN
+  MUTE
+  UNMUTE
+  BAN
+  UNBAN
+}
+
+enum EventType {
+  USER_JOINED
+  USER_LEFT
+  MESSAGE_SENT
+  COMMAND_EXECUTED
+  WARNING_CREATED
+  WARNING_REMOVED
+  MUTE_APPLIED
+  MUTE_REMOVED
+  BAN_APPLIED
+  BAN_REMOVED
+  SPAM_DETECTED
+  PROFILE_VIEWED
+}
+
+enum Permission {
+  WARN
+  MUTE
+  BAN
+  MANAGE_SETTINGS
+  VIEW_ANALYTICS
+}
+
+enum ReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum SenderType {
+  USER
+  BOT
+  ADMIN
+}
+
+// ---------------------------------------------------------
+// MODELS
+// ---------------------------------------------------------
+
+model ProcessedUpdate {
+  id          String   @id @default(uuid())
+  updateId    BigInt   @unique
+  processedAt DateTime @default(now())
+}
+
+model User {
+  id               String             @id @default(uuid())
+  telegramId       BigInt             @unique
+  username         String?
+  firstName        String
+  reputation       Int                @default(0)
+  warnings         Int                @default(0)
+  isActive         Boolean            @default(true)
+  joinedAt         DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+  
+  groupRoles       GroupRole[]
+  messages         Message[]
+  moderationEvents ModerationAction[] @relation("Moderator")
+  receivedEvents   ModerationAction[] @relation("TargetUser")
+  events           EventLog[]
+}
+
+model Group {
+  id              String             @id @default(uuid())
+  telegramGroupId BigInt             @unique
+  groupName       String
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  deletedAt       DateTime?
+  
+  roles           GroupRole[]
+  settings        GroupSettings?
+  messages        Message[]
+  moderationLogs  ModerationAction[]
+  events          EventLog[]
+}
+
+model GroupRole {
+  id          String       @id @default(uuid())
+  userId      String
+  groupId     String
+  roleName    String       // e.g., "Junior Mod", "Admin"
+  permissions Permission[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId, roleName])
+}
+
+model GroupSettings {
+  id                 String          @id @default(uuid())
+  groupId            String          @unique
+  antiSpamEnabled    Boolean         @default(true)
+  reputationEnabled  Boolean         @default(true)
+  welcomeEnabled     Boolean         @default(false)
+  reportsEnabled     Boolean         @default(false)
+  healthScoreEnabled Boolean         @default(false)
+  warnThreshold      Int             @default(3)
+  muteThreshold      Int             @default(5)
+  reportFrequency    ReportFrequency @default(WEEKLY)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id               String     @id @default(uuid())
+  userId           String
+  groupId          String
+  messageId        BigInt     // Telegram message ID
+  replyToMessageId BigInt?
+  messageText      String
+  isEdited         Boolean    @default(false)
+  senderType       SenderType @default(USER)
+  createdAt        DateTime   @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@index([groupId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ModerationAction {
+  id          String               @id @default(uuid())
+  userId      String
+  groupId     String
+  moderatorId String
+  actionType  ModerationActionType
+  reason      String?
+  createdAt   DateTime             @default(now())
+
+  targetUser User  @relation("TargetUser", fields: [userId], references: [id])
+  moderator  User  @relation("Moderator", fields: [moderatorId], references: [id])
+  group      Group @relation(fields: [groupId], references: [id])
+
+  @@index([groupId, actionType])
+  @@index([createdAt])
+}
+
+model EventLog {
+  id        String    @id @default(uuid())
+  groupId   String?
+  userId    String?
+  eventType EventType
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  group Group? @relation(fields: [groupId], references: [id])
+  user  User?  @relation(fields: [userId], references: [id])
+
+  @@index([groupId, eventType])
+  @@index([createdAt])
+}
