@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '../../../../../db/prisma';
+import { prisma } from '../../../../../../db/prisma';
 
 export async function GET(req: NextRequest, { params }: { params: { groupId: string, userId: string } }) {
   try {

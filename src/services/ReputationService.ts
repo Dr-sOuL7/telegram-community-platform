@@ -1,6 +1,6 @@
 import { ReputationRepository } from '../repositories/ReputationRepository';
-import { ErrorService, ErrorCategory, AppError } from '../errors/ErrorService';
-import { logger } from '../logger/pino';
+import { ErrorService, ErrorCategory, AppError } from '../lib/errors/ErrorService';
+import { logger } from '../lib/logger/pino';
 
 export class ReputationService {
   public static readonly RULES = {

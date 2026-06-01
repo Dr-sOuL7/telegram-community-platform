@@ -2,7 +2,7 @@ import { AnalyticsRepository } from '../repositories/AnalyticsRepository';
 import { ReportRepository } from '../repositories/ReportRepository';
 import { HealthSnapshotRepository } from '../repositories/HealthSnapshotRepository';
 import { ReportType } from '@prisma/client';
-import { logger } from '../logger/pino';
+import { logger } from '../lib/logger/pino';
 
 export class ReportService {
   constructor(

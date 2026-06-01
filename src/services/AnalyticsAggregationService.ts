@@ -1,7 +1,7 @@
 import { AnalyticsRepository } from '../repositories/AnalyticsRepository';
 import { EventLog, EventType } from '@prisma/client';
 import { prisma } from '../db/prisma';
-import { logger } from '../logger/pino';
+import { logger } from '../lib/logger/pino';
 
 export class AnalyticsAggregationService {
   constructor(private analyticsRepo: AnalyticsRepository) {}

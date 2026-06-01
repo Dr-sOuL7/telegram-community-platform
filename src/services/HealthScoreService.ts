@@ -1,6 +1,6 @@
 import { AnalyticsRepository } from '../repositories/AnalyticsRepository';
 import { HealthSnapshotRepository } from '../repositories/HealthSnapshotRepository';
-import { logger } from '../logger/pino';
+import { logger } from '../lib/logger/pino';
 
 export class HealthScoreService {
   constructor(
