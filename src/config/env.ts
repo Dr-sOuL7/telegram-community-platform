@@ -14,7 +14,7 @@ export const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   
   // Application URL (for webhook setup)
-  APP_URL: z.string().url("APP_URL must be a valid URL"),
+  APP_URL: z.string().url("APP_URL must be a valid URL").optional(),
 
   // Feature Flags
   FEATURE_ANALYTICS: z.coerce.boolean().default(false),
