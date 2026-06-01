@@ -49,6 +49,13 @@ enum ReportFrequency {
   MONTHLY
 }
 
+enum ReportType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
 enum SenderType {
   USER
   BOT
@@ -71,6 +78,8 @@ model User {
   username         String?
   firstName        String
   reputation       Int                @default(0)
+  reputationLevel  String?
+  lastReputationChangeAt DateTime?
   warnings         Int                @default(0)
   isActive         Boolean            @default(true)
   joinedAt         DateTime           @default(now())
@@ -82,6 +91,9 @@ model User {
   moderationEvents ModerationAction[] @relation("Moderator")
   receivedEvents   ModerationAction[] @relation("TargetUser")
   events           EventLog[]
+  reputationHistory ReputationHistory[]
+  userActivities    UserActivity[]
+  commandUsages     CommandUsage[]
 }
 
 model Group {
@@ -97,6 +109,13 @@ model Group {
   messages        Message[]
   moderationLogs  ModerationAction[]
   events          EventLog[]
+  reputationHistory ReputationHistory[]
+  userActivities    UserActivity[]
+  metrics           GroupMetrics?
+  dailyMetrics      DailyMetrics[]
+  healthSnapshots   GroupHealthSnapshot[]
+  reports           Report[]
+  commandUsages     CommandUsage[]
 }
 
 model GroupRole {
@@ -179,5 +198,143 @@ model EventLog {
   user  User?  @relation(fields: [userId], references: [id])
 
   @@index([groupId, eventType])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------
+// PHASE 2 MODELS
+// ---------------------------------------------------------
+
+model ReputationHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  groupId    String
+  delta      Int
+  reason     String?
+  sourceType String   // 'message', 'command', 'moderation', 'manual', 'system'
+  sourceId   String?
+  createdAt  DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([groupId])
+  @@index([createdAt])
+}
+
+model UserActivity {
+  id           String   @id @default(uuid())
+  userId       String
+  groupId      String
+  messageCount Int      @default(0)
+  commandCount Int      @default(0)
+  warningCount Int      @default(0)
+  muteCount    Int      @default(0)
+  banCount     Int      @default(0)
+  activeDays   Int      @default(0)
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+}
+
+model GroupMetrics {
+  id                    String   @id @default(uuid())
+  groupId               String   @unique
+  totalMessages         Int      @default(0)
+  totalCommands         Int      @default(0)
+  activeUsers           Int      @default(0)
+  newMembers            Int      @default(0)
+  leftMembers           Int      @default(0)
+  warningsIssued        Int      @default(0)
+  mutesIssued           Int      @default(0)
+  bansIssued            Int      @default(0)
+  spamEvents            Int      @default(0)
+  averageMessagesPerDay Float    @default(0)
+  peakHour              Int?
+  peakDay               Int?
+  updatedAt             DateTime @updatedAt
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model DailyMetrics {
+  id             String   @id @default(uuid())
+  groupId        String
+  date           DateTime // Midnight UTC of the day
+  messages       Int      @default(0)
+  commands       Int      @default(0)
+  activeUsers    Int      @default(0)
+  newMembers     Int      @default(0)
+  leftMembers    Int      @default(0)
+  warnings       Int      @default(0)
+  mutes          Int      @default(0)
+  bans           Int      @default(0)
+  spamEvents     Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, date])
+  @@index([groupId])
+  @@index([date])
+}
+
+model GroupHealthSnapshot {
+  id               String   @id @default(uuid())
+  groupId          String
+  score            Float
+  engagementScore  Float
+  moderationScore  Float
+  spamRiskScore    Float
+  retentionScore   Float
+  activityScore    Float
+  createdAt        DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([createdAt])
+}
+
+model Report {
+  id          String     @id @default(uuid())
+  groupId     String
+  reportType  ReportType
+  title       String
+  summary     String
+  payload     Json
+  generatedBy String
+  createdAt   DateTime   @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([reportType])
+  @@index([createdAt])
+}
+
+model CommandUsage {
+  id          String   @id @default(uuid())
+  groupId     String?
+  userId      String
+  commandName String
+  category    String
+  success     Boolean
+  latencyMs   Int
+  createdAt   DateTime @default(now())
+
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([userId])
+  @@index([commandName])
   @@index([createdAt])
 }

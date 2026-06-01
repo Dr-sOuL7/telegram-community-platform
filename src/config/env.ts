@@ -22,6 +22,9 @@ export const envSchema = z.object({
   FEATURE_HEALTH_SCORE: z.coerce.boolean().default(false),
   FEATURE_AI: z.coerce.boolean().default(false),
   FEATURE_REPUTATION: z.coerce.boolean().default(true),
+
+  // Cron Security
+  CRON_SECRET: z.string().min(1, "CRON_SECRET is required to secure cron endpoints"),
 });
 
 // We parse process.env when this module is imported to fail fast if env vars are missing

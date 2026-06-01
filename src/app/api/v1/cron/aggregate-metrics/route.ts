@@ -1,0 +1,22 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { env } from '../../../../../config/env';
+import { analyticsService } from '../../../../../services/container';
+import { prisma } from '../../../../../db/prisma';
+
+export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('authorization');
+  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    // For every group, aggregate rolling metrics
+    const groups = await prisma.group.findMany({ select: { id: true } });
+    for (const group of groups) {
+      await analyticsService.aggregateRollingMetrics(group.id);
+    }
+    return NextResponse.json({ success: true, groupsProcessed: groups.length });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
