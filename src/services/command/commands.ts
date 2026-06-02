@@ -2,6 +2,7 @@ import { registerCommand, commandRegistry } from './registry';
 import { reputationService, healthScoreService, reportService, analyticsRepo } from '../container';
 import { telegramClient } from '../../lib/telegram/TelegramClient';
 import { summarizationService, aiAssistantService } from '../container';
+import { env } from '../../config/env';
 
 // ─── Core Commands ───────────────────────────────────────────────
 
@@ -29,11 +30,19 @@ registerCommand({
       `🛡️ Moderation tools`,
       ``,
       `Type /help to see all available commands.`,
-      ``,
-      `🔗 Dashboard: Use the web dashboard for full analytics and management.`,
     ].join('\n');
 
-    await telegramClient.sendMessage(message.chat.id, text);
+    const botUsername = 'CommunityManager1Bot'; // Should ideally be fetched dynamically, but hardcoding for now
+
+    await telegramClient.sendMessage(message.chat.id, text, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🚀 Open Web Dashboard", web_app: { url: `${env.APP_URL}/dashboard` } }],
+          [{ text: "➕ Add Bot to your Group", url: `https://t.me/${botUsername}?startgroup=true` }],
+          [{ text: "📖 View Documentation", url: `${env.APP_URL}` }]
+        ]
+      }
+    });
   }
 });
 
@@ -71,7 +80,13 @@ registerCommand({
       `Tip: Use /ask <question> to chat with the AI about your community.`,
     ].join('\n');
 
-    await telegramClient.sendMessage(message.chat.id, text);
+    await telegramClient.sendMessage(message.chat.id, text, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🌐 Full Command List Online", web_app: { url: `${env.APP_URL}/dashboard/commands` } }]
+        ]
+      }
+    });
   }
 });
 
@@ -105,8 +120,6 @@ registerCommand({
     const { message } = ctx;
     if (!message.from || !message.chat) return;
     
-    // In a real app we'd fetch the DB, here we're demonstrating the integration
-    // We would use a user repo, but for simplicity let's use a dummy value if missing
     await telegramClient.sendMessage(message.chat.id, `👤 ${message.from.first_name}, your reputation is being tracked. Use the dashboard API for exact numbers in Phase 2!`);
   }
 });
@@ -129,7 +142,13 @@ registerCommand({
     const health = await healthScoreService.getLatestScore(internalGroupId);
     const score = health?.score || 'N/A';
     
-    await telegramClient.sendMessage(message.chat.id, `❤️ Community Health Score: ${score}/100`);
+    await telegramClient.sendMessage(message.chat.id, `❤️ Community Health Score: ${score}/100`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📊 View Detailed Analytics", web_app: { url: `${env.APP_URL}/dashboard/groups/${internalGroupId}` } }]
+        ]
+      }
+    });
   }
 });
 
@@ -155,7 +174,13 @@ registerCommand({
     }
     
     const text = `📊 **Group Stats**\nMessages: ${stats.totalMessages}\nCommands: ${stats.totalCommands}\nWarnings: ${stats.warningsIssued}\nBans: ${stats.bansIssued}`;
-    await telegramClient.sendMessage(message.chat.id, text);
+    await telegramClient.sendMessage(message.chat.id, text, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📊 View Detailed Analytics", web_app: { url: `${env.APP_URL}/dashboard/groups/${internalGroupId}` } }]
+        ]
+      }
+    });
   }
 });
 
