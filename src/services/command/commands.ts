@@ -117,10 +117,17 @@ registerCommand({
   adminOnly: false,
   usage: '/reputation',
   execute: async (ctx) => {
-    const { message } = ctx;
-    if (!message.from || !message.chat) return;
+    const { message, internalUserId } = ctx;
+    if (!message.from || !message.chat || !internalUserId) return;
     
-    await telegramClient.sendMessage(message.chat.id, `👤 ${message.from.first_name}, your reputation is being tracked. Use the dashboard API for exact numbers in Phase 2!`);
+    try {
+      import('../../db/prisma').then(async ({ prisma }) => {
+        const user = await prisma.user.findUnique({ where: { id: internalUserId } });
+        if (!user) return;
+        
+        await telegramClient.sendMessage(message.chat.id, `👤 **${message.from.first_name}**, your current reputation score is **${user.reputation}**.`);
+      });
+    } catch (e) {}
   }
 });
 
@@ -241,6 +248,233 @@ registerCommand({
       await telegramClient.sendMessage(message.chat.id, `🤖 **AI Assistant:**\n\n${answer}`);
     } catch (e: any) {
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to get answer: ${e.message}`);
+    }
+  }
+});
+
+// ─── Moderation Commands ─────────────────────────────────────────
+
+async function isUserAdmin(chatId: bigint | number, userId: bigint | number): Promise<boolean> {
+  try {
+    const member = await telegramClient.getChatMember(chatId, userId);
+    return member.status === 'creator' || member.status === 'administrator';
+  } catch {
+    return false;
+  }
+}
+
+function getTargetUser(message: any) {
+  if (message.reply_to_message?.from) {
+    return message.reply_to_message.from;
+  }
+  return null;
+}
+
+registerCommand({
+  name: 'ban',
+  description: 'Ban a user from the group (Reply to their message)',
+  category: 'Moderation',
+  adminOnly: true, // Internal DB role check (we also verify natively below)
+  usage: '/ban [reason]',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat || !internalGroupId || !internalUserId) return;
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
+
+    const target = getTargetUser(message);
+    if (!target) {
+      await telegramClient.sendMessage(message.chat.id, "Please reply to a message from the user you want to ban.");
+      return;
+    }
+
+    const reason = message.text.split(' ').slice(1).join(' ') || 'No reason provided';
+
+    try {
+      await telegramClient.banChatMember(message.chat.id, target.id);
+      await telegramClient.sendMessage(message.chat.id, `🔨 **${target.first_name}** has been banned.\nReason: ${reason}`);
+      
+      import('../container').then(({ userRepo, moderationRepo }) => {
+        userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(targetUser => {
+          moderationRepo.logAction({
+            userId: targetUser.id,
+            groupId: internalGroupId,
+            moderatorId: internalUserId,
+            actionType: 'BAN',
+            reason
+          });
+        });
+      });
+    } catch (e: any) {
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to ban: ${e.message}`);
+    }
+  }
+});
+
+registerCommand({
+  name: 'mute',
+  description: 'Mute a user (Reply to their message)',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/mute [reason]',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat || !internalGroupId || !internalUserId) return;
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
+
+    const target = getTargetUser(message);
+    if (!target) {
+      await telegramClient.sendMessage(message.chat.id, "Please reply to a message from the user you want to mute.");
+      return;
+    }
+
+    const reason = message.text.split(' ').slice(1).join(' ') || 'No reason provided';
+    const untilDate = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+
+    try {
+      await telegramClient.restrictChatMember(message.chat.id, target.id, { can_send_messages: false }, untilDate);
+      await telegramClient.sendMessage(message.chat.id, `🔇 **${target.first_name}** has been muted for 1 hour.\nReason: ${reason}`);
+      
+      import('../container').then(({ userRepo, moderationRepo }) => {
+        userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(targetUser => {
+          moderationRepo.logAction({
+            userId: targetUser.id,
+            groupId: internalGroupId,
+            moderatorId: internalUserId,
+            actionType: 'MUTE',
+            reason
+          });
+        });
+      });
+    } catch (e: any) {
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to mute: ${e.message}`);
+    }
+  }
+});
+
+registerCommand({
+  name: 'warn',
+  description: 'Warn a user (Reply to their message)',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/warn [reason]',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat || !internalGroupId || !internalUserId) return;
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
+
+    const target = getTargetUser(message);
+    if (!target) {
+      await telegramClient.sendMessage(message.chat.id, "Please reply to a message from the user you want to warn.");
+      return;
+    }
+
+    const reason = message.text.split(' ').slice(1).join(' ') || 'No reason provided';
+
+    try {
+      await telegramClient.sendMessage(message.chat.id, `⚠️ **${target.first_name}**, you have been warned.\nReason: ${reason}`);
+      
+      import('../container').then(({ userRepo, moderationRepo, groupRepo }) => {
+        userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(async targetUser => {
+          await moderationRepo.logAction({
+            userId: targetUser.id,
+            groupId: internalGroupId,
+            moderatorId: internalUserId,
+            actionType: 'WARN',
+            reason
+          });
+          
+          // Apply internal warning increment
+          import('../../db/prisma').then(({ prisma }) => {
+             prisma.user.update({
+               where: { id: targetUser.id },
+               data: { warnings: { increment: 1 } }
+             }).catch(() => {});
+          });
+        });
+      });
+    } catch (e: any) {
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to warn: ${e.message}`);
+    }
+  }
+});
+
+registerCommand({
+  name: 'delete',
+  description: 'Delete a message (Reply to it)',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/delete',
+  execute: async (ctx) => {
+    const { message } = ctx;
+    if (!message.chat) return;
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
+
+    if (!message.reply_to_message) {
+      await telegramClient.sendMessage(message.chat.id, "Please reply to the message you want to delete.");
+      return;
+    }
+
+    try {
+      await telegramClient.deleteMessage(message.chat.id, message.reply_to_message.message_id);
+      // Also delete the command message itself
+      await telegramClient.deleteMessage(message.chat.id, message.message_id);
+    } catch (e: any) {
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to delete: ${e.message}`);
+    }
+  }
+});
+
+// ─── Profile & Reputation ────────────────────────────────────────
+
+registerCommand({
+  name: 'profile',
+  description: 'View your comprehensive community profile',
+  category: 'User',
+  adminOnly: false,
+  usage: '/profile',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat || !internalGroupId || !internalUserId) return;
+
+    try {
+      import('../../db/prisma').then(async ({ prisma }) => {
+        const user = await prisma.user.findUnique({ where: { id: internalUserId } });
+        const msgs = await prisma.message.count({ where: { userId: internalUserId, groupId: internalGroupId } });
+        
+        if (!user) return;
+
+        const text = `👤 **Profile: ${user.firstName}**\n\n` +
+          `⭐ Reputation: **${user.reputation}**\n` +
+          `💬 Messages Sent: **${msgs}**\n` +
+          `⚠️ Warnings: **${user.warnings}**\n\n` +
+          `📅 Joined Network: ${user.joinedAt.toDateString()}`;
+          
+        await telegramClient.sendMessage(message.chat.id, text, {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🏆 View Leaderboards", web_app: { url: `${env.APP_URL}/public/leaderboard` } }]
+            ]
+          }
+        });
+      });
+    } catch (e) {
+      // ignore
     }
   }
 });

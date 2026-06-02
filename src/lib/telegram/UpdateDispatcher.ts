@@ -43,6 +43,32 @@ export class UpdateDispatcher {
       }
     }
 
+    if (update.message?.new_chat_members) {
+      if (isGroup && internalGroupId) {
+        const group = await groupRepo.findById(internalGroupId);
+        if (group?.settings?.welcomeEnabled && group.settings.welcomeMessage) {
+          for (const member of update.message.new_chat_members) {
+            // Replace generic tags with actual user names
+            const msgText = group.settings.welcomeMessage.replace('{name}', member.first_name);
+            await telegramClient.sendMessage(update.message.chat.id, msgText);
+          }
+        }
+      }
+      return;
+    }
+
+    if (update.message?.left_chat_member) {
+      if (isGroup && internalGroupId) {
+        const group = await groupRepo.findById(internalGroupId);
+        if (group?.settings?.farewellEnabled && group.settings.farewellMessage) {
+          const member = update.message.left_chat_member;
+          const msgText = group.settings.farewellMessage.replace('{name}', member.first_name);
+          await telegramClient.sendMessage(update.message.chat.id, msgText);
+        }
+      }
+      return;
+    }
+
     if (update.message && update.message.text && update.message.text.startsWith('/')) {
       const parts = update.message.text.split(' ');
       const commandName = parts[0].substring(1).split('@')[0];
@@ -93,6 +119,17 @@ export class UpdateDispatcher {
           url: `${env.APP_URL}/api/v1/worker/process-event`,
           body: event,
         });
+
+        // Trigger Auto-Spam Punisher asynchronously
+        const telegramGroupId = update.message.chat.id;
+        const telegramUserId = update.message.from?.id;
+        if (telegramGroupId && telegramUserId) {
+          // Dynamic import to avoid circular dependency
+          import('../../services/spam/SpamService').then(({ spamService }) => {
+            spamService.checkVelocityAndPunish(internalGroupId, internalUserId, BigInt(telegramGroupId), BigInt(telegramUserId))
+              .catch(err => logger.error({ err }, 'SpamService failed'));
+          });
+        }
       }
     }
   }

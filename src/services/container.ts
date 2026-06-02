@@ -10,6 +10,7 @@ import { CommunityInsightRepository } from '../repositories/CommunityInsightRepo
 import { RecommendationRepository } from '../repositories/RecommendationRepository';
 import { GroupRepository } from '../repositories/GroupRepository';
 import { UserRepository } from '../repositories/UserRepository';
+import { ModerationRepository } from '../repositories/ModerationRepository';
 
 import { ReputationService } from './ReputationService';
 import { AnalyticsAggregationService } from './AnalyticsAggregationService';
@@ -39,6 +40,7 @@ export const reportRepo = new ReportRepository();
 export const eventLogRepo = new EventLogRepository();
 export const groupRepo = new GroupRepository();
 export const userRepo = new UserRepository();
+export const moderationRepo = new ModerationRepository();
 
 // AI Repositories
 export const aiSettingsRepo = new AISettingsRepository();

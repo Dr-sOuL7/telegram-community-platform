@@ -146,8 +146,14 @@ model GroupSettings {
   id                 String          @id @default(uuid())
   groupId            String          @unique
   antiSpamEnabled    Boolean         @default(true)
+  spamThresholdMsg   Int             @default(5)
+  spamThresholdTime  Int             @default(10) // seconds
+  spamAction         String          @default("WARN") // WARN, MUTE, BAN
   reputationEnabled  Boolean         @default(true)
   welcomeEnabled     Boolean         @default(false)
+  welcomeMessage     String?         @db.Text
+  farewellEnabled    Boolean         @default(false)
+  farewellMessage    String?         @db.Text
   reportsEnabled     Boolean         @default(false)
   healthScoreEnabled Boolean         @default(false)
   warnThreshold      Int             @default(3)
