@@ -6,13 +6,17 @@ import { eventLogRepo, groupRepo, userRepo } from '../../services/container';
 import { getQStashClient } from '../qstash';
 import { env } from '../../config/env';
 import { telegramClient } from './TelegramClient';
+import { spamService } from '../../services/spam/SpamService';
 
 export class UpdateDispatcher {
   async dispatch(update: TelegramUpdate, requestId: string): Promise<void> {
     let internalGroupId: string | undefined = undefined;
     let internalUserId: string | undefined = undefined;
 
-    // Resolve User
+    // ─── CRITICAL PATH: User & Group Resolution ──────────────────
+    // These upserts are critical because they produce the internal IDs
+    // needed by command execution and permission checks.
+
     if (update.message?.from) {
       try {
         const user = await userRepo.upsert(
@@ -28,7 +32,6 @@ export class UpdateDispatcher {
       }
     }
 
-    // Resolve Group
     const chatType = update.message?.chat?.type;
     const isGroup = chatType === 'group' || chatType === 'supergroup';
 
@@ -44,15 +47,20 @@ export class UpdateDispatcher {
       }
     }
 
+    // ─── CRITICAL PATH: Welcome / Farewell Messages ──────────────
+
     if (update.message?.new_chat_members) {
       if (isGroup && internalGroupId) {
-        const group = await groupRepo.findById(internalGroupId);
-        if (group?.settings?.welcomeEnabled && group.settings.welcomeMessage) {
-          for (const member of update.message.new_chat_members) {
-            // Replace generic tags with actual user names
-            const msgText = group.settings.welcomeMessage.replace('{name}', member.first_name);
-            await telegramClient.sendMessage(update.message.chat.id, msgText);
+        try {
+          const group = await groupRepo.findById(internalGroupId);
+          if (group?.settings?.welcomeEnabled && group.settings.welcomeMessage) {
+            for (const member of update.message.new_chat_members) {
+              const msgText = group.settings.welcomeMessage.replace('{name}', member.first_name);
+              await telegramClient.sendMessage(update.message.chat.id, msgText);
+            }
           }
+        } catch (err) {
+          logger.error({ err, internalGroupId }, 'Failed to send welcome message');
         }
       }
       return;
@@ -60,15 +68,21 @@ export class UpdateDispatcher {
 
     if (update.message?.left_chat_member) {
       if (isGroup && internalGroupId) {
-        const group = await groupRepo.findById(internalGroupId);
-        if (group?.settings?.farewellEnabled && group.settings.farewellMessage) {
-          const member = update.message.left_chat_member;
-          const msgText = group.settings.farewellMessage.replace('{name}', member.first_name);
-          await telegramClient.sendMessage(update.message.chat.id, msgText);
+        try {
+          const group = await groupRepo.findById(internalGroupId);
+          if (group?.settings?.farewellEnabled && group.settings.farewellMessage) {
+            const member = update.message.left_chat_member;
+            const msgText = group.settings.farewellMessage.replace('{name}', member.first_name);
+            await telegramClient.sendMessage(update.message.chat.id, msgText);
+          }
+        } catch (err) {
+          logger.error({ err, internalGroupId }, 'Failed to send farewell message');
         }
       }
       return;
     }
+
+    // ─── CRITICAL PATH: Command Execution ────────────────────────
 
     if (update.message && update.message.text && update.message.text.startsWith('/')) {
       const parts = update.message.text.split(' ');
@@ -84,54 +98,61 @@ export class UpdateDispatcher {
             internalGroupId, 
             internalUserId 
           });
-          
-          if (isGroup && internalGroupId && internalUserId) {
-            const event = await eventLogRepo.logEvent({
-              groupId: internalGroupId,
-              userId: internalUserId,
-              eventType: 'COMMAND_EXECUTED',
-              metadata: { commandName }
-            });
-            
-            // Dispatch to async event processor
-            await getQStashClient().publishJSON({
-              url: `${env.APP_URL}/api/v1/worker/process-event`,
-              body: event,
-            });
-          }
         } catch (error) {
           logger.error({ requestId, commandName, err: error }, 'Command execution failed');
+        }
+
+        // ─── NON-CRITICAL: Log command event (fire-and-forget) ────
+        if (isGroup && internalGroupId && internalUserId) {
+          this.deferEventLog(internalGroupId, internalUserId, 'COMMAND_EXECUTED', { commandName })
+            .catch(err => logger.error({ err, requestId }, 'Non-critical: failed to log command event'));
         }
       } else {
         logger.debug({ requestId, commandName }, 'Command not found in registry');
       }
-    } else if (update.message) {
+      return;
+    }
+
+    // ─── CRITICAL PATH: Standard Message — Spam Detection ────────
+
+    if (update.message) {
       if (isGroup && internalGroupId && internalUserId) {
-        logger.info({ requestId }, 'Received standard message, logging to event stream...');
-
-        const event = await eventLogRepo.logEvent({
-          groupId: internalGroupId,
-          userId: internalUserId,
-          eventType: 'MESSAGE_SENT'
-        });
-        
-        // Dispatch to async event processor
-        await getQStashClient().publishJSON({
-          url: `${env.APP_URL}/api/v1/worker/process-event`,
-          body: event,
-        });
-
-        // Trigger Auto-Spam Punisher asynchronously
+        // Spam detection is critical — it's a moderation action
         const telegramGroupId = update.message.chat.id;
         const telegramUserId = update.message.from?.id;
         if (telegramGroupId && telegramUserId) {
-          // Dynamic import to avoid circular dependency
-          import('../../services/spam/SpamService').then(({ spamService }) => {
-            spamService.checkVelocityAndPunish(internalGroupId, internalUserId, BigInt(telegramGroupId), BigInt(telegramUserId))
-              .catch(err => logger.error({ err }, 'SpamService failed'));
-          });
+          try {
+            await spamService.checkVelocityAndPunish(
+              internalGroupId, internalUserId,
+              BigInt(telegramGroupId), BigInt(telegramUserId)
+            );
+          } catch (err) {
+            logger.error({ err, requestId }, 'SpamService check failed');
+          }
         }
+
+        // ─── NON-CRITICAL: Log message event (fire-and-forget) ────
+        this.deferEventLog(internalGroupId, internalUserId, 'MESSAGE_SENT')
+          .catch(err => logger.error({ err, requestId }, 'Non-critical: failed to log message event'));
       }
     }
+  }
+
+  /**
+   * Fire-and-forget: logs an event to the database, then publishes it
+   * to the QStash analytics worker. Errors here must never block the
+   * critical path.
+   */
+  private async deferEventLog(
+    groupId: string,
+    userId: string,
+    eventType: 'COMMAND_EXECUTED' | 'MESSAGE_SENT',
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    const event = await eventLogRepo.logEvent({ groupId, userId, eventType, metadata });
+    await getQStashClient().publishJSON({
+      url: `${env.APP_URL}/api/v1/worker/process-event`,
+      body: event,
+    });
   }
 }

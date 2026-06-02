@@ -1,15 +1,20 @@
 import { prisma } from "../../db/prisma";
 import { telegramClient } from "../../lib/telegram/TelegramClient";
 import { logger } from "../../lib/logger/pino";
-import { moderationRepo } from "../container";
-import { groupRepo } from "../container";
+import { moderationRepo, groupRepo } from "../container";
+import { getSystemUserId } from "../system/SystemUser";
 
 export class SpamService {
   /**
    * Checks if a user is sending messages too fast and punishes them if so.
-   * Runs asynchronously in the background.
+   * This is a CRITICAL operation — runs synchronously in the dispatch path.
    */
-  async checkVelocityAndPunish(internalGroupId: string, internalUserId: string, telegramGroupId: bigint, telegramUserId: bigint): Promise<void> {
+  async checkVelocityAndPunish(
+    internalGroupId: string,
+    internalUserId: string,
+    telegramGroupId: bigint,
+    telegramUserId: bigint
+  ): Promise<void> {
     try {
       // 1. Get Group Settings
       const group = await groupRepo.findById(internalGroupId);
@@ -34,9 +39,10 @@ export class SpamService {
       // 3. If below threshold, all good
       if (recentMessagesCount < thresholdMsg) return;
 
-      // 4. Threshold breached, execute spam punishment
-      logger.warn({ internalGroupId, internalUserId, count: recentMessagesCount }, 'Spam threshold breached!');
+      // 4. Threshold breached — resolve SYSTEM user for audit trail
+      logger.warn({ internalGroupId, internalUserId, count: recentMessagesCount }, 'Spam threshold breached');
 
+      const systemUserId = await getSystemUserId();
       const reason = `Auto-Spam Protection: Sent ${recentMessagesCount} messages in ${thresholdTime} seconds.`;
 
       if (action === "WARN") {
@@ -44,7 +50,7 @@ export class SpamService {
         await moderationRepo.createAction({
           userId: internalUserId,
           groupId: internalGroupId,
-          moderatorId: internalUserId, // System action, user is their own moderator for logs here or we use a system user
+          moderatorId: systemUserId,
           actionType: "WARN",
           reason,
         });
@@ -56,7 +62,7 @@ export class SpamService {
         await moderationRepo.createAction({
           userId: internalUserId,
           groupId: internalGroupId,
-          moderatorId: internalUserId,
+          moderatorId: systemUserId,
           actionType: "MUTE",
           reason,
         });
@@ -67,13 +73,13 @@ export class SpamService {
         await moderationRepo.createAction({
           userId: internalUserId,
           groupId: internalGroupId,
-          moderatorId: internalUserId,
+          moderatorId: systemUserId,
           actionType: "BAN",
           reason,
         });
       }
 
-      // Log the event
+      // Log the spam detection event (non-critical, but we're already in the try block)
       await prisma.eventLog.create({
         data: {
           groupId: internalGroupId,

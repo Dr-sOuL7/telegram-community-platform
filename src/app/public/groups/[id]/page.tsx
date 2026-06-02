@@ -4,6 +4,8 @@ import { Users, MessageSquare, Activity, ShieldAlert, Sparkles } from "lucide-re
 import { PremiumCard } from "@/components/ui/premium/PremiumCard";
 import { PageHeader } from "@/components/ui/premium/PageHeader";
 
+export const dynamic = 'force-dynamic';
+
 export default async function PublicGroupPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const group = await prisma.group.findUnique({

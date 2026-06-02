@@ -2,6 +2,8 @@ import { prisma } from "@/db/prisma";
 import { ShieldAlert, Activity, MessageSquare, ArrowRight, Bot } from "lucide-react";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 export default async function LandingPage() {
   const [totalGroups, totalMessages, totalUsers] = await Promise.all([
     prisma.group.count({ where: { isActive: true } }),

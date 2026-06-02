@@ -1,8 +1,10 @@
 import { registerCommand, commandRegistry } from './registry';
-import { reputationService, healthScoreService, reportService, analyticsRepo } from '../container';
+import { reputationService, healthScoreService, reportService, analyticsRepo, userRepo, moderationRepo } from '../container';
 import { telegramClient } from '../../lib/telegram/TelegramClient';
 import { summarizationService, aiAssistantService } from '../container';
 import { env } from '../../config/env';
+import { prisma } from '../../db/prisma';
+import { logger } from '../../lib/logger/pino';
 
 // ─── Core Commands ───────────────────────────────────────────────
 
@@ -32,7 +34,7 @@ registerCommand({
       `Type /help to see all available commands.`,
     ].join('\n');
 
-    const botUsername = 'CommunityManager1Bot'; // Should ideally be fetched dynamically, but hardcoding for now
+    const botUsername = 'CommunityManager1Bot';
 
     await telegramClient.sendMessage(message.chat.id, text, {
       reply_markup: {
@@ -110,6 +112,7 @@ registerCommand({
 });
 
 // ─── Feature Commands ────────────────────────────────────────────
+
 registerCommand({
   name: 'reputation',
   description: 'View your current reputation score',
@@ -124,13 +127,13 @@ registerCommand({
     const chatId = message.chat.id;
 
     try {
-      import('../../db/prisma').then(async ({ prisma }) => {
-        const user = await prisma.user.findUnique({ where: { id: internalUserId } });
-        if (!user) return;
-        
-        await telegramClient.sendMessage(chatId, `👤 **${firstName}**, your current reputation score is **${user.reputation}**.`);
-      });
-    } catch (e) {}
+      const user = await prisma.user.findUnique({ where: { id: internalUserId } });
+      if (!user) return;
+      
+      await telegramClient.sendMessage(chatId, `👤 **${firstName}**, your current reputation score is **${user.reputation}**.`);
+    } catch (e) {
+      logger.error({ err: e, internalUserId }, 'Failed to fetch reputation');
+    }
   }
 });
 
@@ -277,7 +280,7 @@ registerCommand({
   name: 'ban',
   description: 'Ban a user from the group (Reply to their message)',
   category: 'Moderation',
-  adminOnly: true, // Internal DB role check (we also verify natively below)
+  adminOnly: true,
   usage: '/ban [reason]',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
@@ -297,21 +300,21 @@ registerCommand({
     const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
 
     try {
+      // Critical: Execute the Telegram API ban
       await telegramClient.banChatMember(message.chat.id, target.id);
       await telegramClient.sendMessage(message.chat.id, `🔨 **${target.first_name}** has been banned.\nReason: ${reason}`);
       
-      import('../container').then(({ userRepo, moderationRepo }) => {
-        userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(targetUser => {
-          moderationRepo.createAction({
-            userId: targetUser.id,
-            groupId: internalGroupId,
-            moderatorId: internalUserId,
-            actionType: 'BAN',
-            reason
-          });
-        });
+      // Critical: Log the moderation action to the database
+      const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
+      await moderationRepo.createAction({
+        userId: targetUser.id,
+        groupId: internalGroupId,
+        moderatorId: internalUserId,
+        actionType: 'BAN',
+        reason
       });
     } catch (e: any) {
+      logger.error({ err: e, internalGroupId }, 'Failed to ban user');
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to ban: ${e.message}`);
     }
   }
@@ -345,18 +348,16 @@ registerCommand({
       await telegramClient.restrictChatMember(message.chat.id, target.id, { can_send_messages: false }, untilDate);
       await telegramClient.sendMessage(message.chat.id, `🔇 **${target.first_name}** has been muted for 1 hour.\nReason: ${reason}`);
       
-      import('../container').then(({ userRepo, moderationRepo }) => {
-        userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(targetUser => {
-          moderationRepo.createAction({
-            userId: targetUser.id,
-            groupId: internalGroupId,
-            moderatorId: internalUserId,
-            actionType: 'MUTE',
-            reason
-          });
-        });
+      const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
+      await moderationRepo.createAction({
+        userId: targetUser.id,
+        groupId: internalGroupId,
+        moderatorId: internalUserId,
+        actionType: 'MUTE',
+        reason
       });
     } catch (e: any) {
+      logger.error({ err: e, internalGroupId }, 'Failed to mute user');
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to mute: ${e.message}`);
     }
   }
@@ -388,26 +389,22 @@ registerCommand({
     try {
       await telegramClient.sendMessage(message.chat.id, `⚠️ **${target.first_name}**, you have been warned.\nReason: ${reason}`);
       
-      import('../container').then(({ userRepo, moderationRepo, groupRepo }) => {
-        userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(async targetUser => {
-          await moderationRepo.createAction({
-            userId: targetUser.id,
-            groupId: internalGroupId,
-            moderatorId: internalUserId,
-            actionType: 'WARN',
-            reason
-          });
-          
-          // Apply internal warning increment
-          import('../../db/prisma').then(({ prisma }) => {
-             prisma.user.update({
-               where: { id: targetUser.id },
-               data: { warnings: { increment: 1 } }
-             }).catch(() => {});
-          });
-        });
+      const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
+      await moderationRepo.createAction({
+        userId: targetUser.id,
+        groupId: internalGroupId,
+        moderatorId: internalUserId,
+        actionType: 'WARN',
+        reason
+      });
+      
+      // Increment warning count
+      await prisma.user.update({
+        where: { id: targetUser.id },
+        data: { warnings: { increment: 1 } }
       });
     } catch (e: any) {
+      logger.error({ err: e, internalGroupId }, 'Failed to warn user');
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to warn: ${e.message}`);
     }
   }
@@ -435,9 +432,9 @@ registerCommand({
 
     try {
       await telegramClient.deleteMessage(message.chat.id, message.reply_to_message.message_id);
-      // Also delete the command message itself
       await telegramClient.deleteMessage(message.chat.id, message.message_id);
     } catch (e: any) {
+      logger.error({ err: e }, 'Failed to delete message');
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to delete: ${e.message}`);
     }
   }
@@ -456,28 +453,26 @@ registerCommand({
     if (!message.chat || !internalGroupId || !internalUserId) return;
 
     try {
-      import('../../db/prisma').then(async ({ prisma }) => {
-        const user = await prisma.user.findUnique({ where: { id: internalUserId } });
-        const msgs = await prisma.message.count({ where: { userId: internalUserId, groupId: internalGroupId } });
-        
-        if (!user) return;
+      const user = await prisma.user.findUnique({ where: { id: internalUserId } });
+      const msgs = await prisma.message.count({ where: { userId: internalUserId, groupId: internalGroupId } });
+      
+      if (!user) return;
 
-        const text = `👤 **Profile: ${user.firstName}**\n\n` +
-          `⭐ Reputation: **${user.reputation}**\n` +
-          `💬 Messages Sent: **${msgs}**\n` +
-          `⚠️ Warnings: **${user.warnings}**\n\n` +
-          `📅 Joined Network: ${user.joinedAt.toDateString()}`;
-          
-        await telegramClient.sendMessage(message.chat.id, text, {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🏆 View Leaderboards", web_app: { url: `${env.APP_URL}/public/leaderboard` } }]
-            ]
-          }
-        });
+      const text = `👤 **Profile: ${user.firstName}**\n\n` +
+        `⭐ Reputation: **${user.reputation}**\n` +
+        `💬 Messages Sent: **${msgs}**\n` +
+        `⚠️ Warnings: **${user.warnings}**\n\n` +
+        `📅 Joined Network: ${user.joinedAt.toDateString()}`;
+        
+      await telegramClient.sendMessage(message.chat.id, text, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🏆 View Leaderboards", web_app: { url: `${env.APP_URL}/public/leaderboard` } }]
+          ]
+        }
       });
     } catch (e) {
-      // ignore
+      logger.error({ err: e, internalUserId, internalGroupId }, 'Failed to fetch profile');
     }
   }
 });

@@ -13,8 +13,8 @@ export const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   
-  // Application URL (for webhook setup)
-  APP_URL: z.string().url("APP_URL must be a valid URL").optional(),
+  // Application URL (for webhook setup and QStash callbacks)
+  APP_URL: z.string().url("APP_URL must be a valid URL — required for QStash callbacks"),
 
   // Auth Configuration
   AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required"),
@@ -41,10 +41,10 @@ export const envSchema = z.object({
   // Cron Security
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required to secure cron endpoints"),
 
-  // Upstash QStash
-  QSTASH_TOKEN: z.string().min(1, "QSTASH_TOKEN is required").optional(),
-  QSTASH_CURRENT_SIGNING_KEY: z.string().min(1).optional(),
-  QSTASH_NEXT_SIGNING_KEY: z.string().min(1).optional(),
+  // Upstash QStash — REQUIRED for the event queue pipeline
+  QSTASH_TOKEN: z.string().min(1, "QSTASH_TOKEN is required — configure Upstash QStash"),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().min(1, "QSTASH_CURRENT_SIGNING_KEY is required — configure Upstash QStash"),
+  QSTASH_NEXT_SIGNING_KEY: z.string().min(1, "QSTASH_NEXT_SIGNING_KEY is required — configure Upstash QStash"),
 });
 
 // We parse process.env when this module is imported to fail fast if env vars are missing

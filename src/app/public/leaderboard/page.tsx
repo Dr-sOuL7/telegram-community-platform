@@ -4,6 +4,8 @@ import { PremiumCard } from "@/components/ui/premium/PremiumCard";
 import { PageHeader } from "@/components/ui/premium/PageHeader";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 export default async function LeaderboardPage() {
   // Fetch top groups by health score (we need to join Group with the latest HealthSnapshot)
   // Since Prisma doesn't easily allow cross-table sorting by latest child, we'll fetch active groups and their latest snapshot
