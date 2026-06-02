@@ -75,6 +75,10 @@ export class TelegramClient {
       user_id: userId.toString(),
     });
   }
+
+  async setMyCommands(commands: { command: string; description: string }[]) {
+    return this.request('setMyCommands', { commands });
+  }
 }
 
 export const telegramClient = new TelegramClient();

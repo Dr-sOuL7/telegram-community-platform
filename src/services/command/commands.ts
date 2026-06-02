@@ -1,8 +1,100 @@
-import { registerCommand } from './registry';
+import { registerCommand, commandRegistry } from './registry';
 import { reputationService, healthScoreService, reportService, analyticsRepo } from '../container';
 import { telegramClient } from '../../lib/telegram/TelegramClient';
 import { summarizationService, aiAssistantService } from '../container';
 
+// ─── Core Commands ───────────────────────────────────────────────
+
+registerCommand({
+  name: 'start',
+  description: 'Welcome message and bot introduction',
+  category: 'Utility',
+  adminOnly: false,
+  usage: '/start',
+  execute: async (ctx) => {
+    const { message } = ctx;
+    if (!message.chat) return;
+
+    const name = message.from?.first_name || 'there';
+    const text = [
+      `👋 Hey ${name}! Welcome to the Community Intelligence Bot.`,
+      ``,
+      `I help admins understand and manage their Telegram communities with:`,
+      ``,
+      `📊 Real-time analytics & group stats`,
+      `⭐ Reputation tracking for members`,
+      `❤️ Community health scoring`,
+      `🤖 AI-powered summaries & insights`,
+      `📝 Automated daily/weekly/monthly reports`,
+      `🛡️ Moderation tools`,
+      ``,
+      `Type /help to see all available commands.`,
+      ``,
+      `🔗 Dashboard: Use the web dashboard for full analytics and management.`,
+    ].join('\n');
+
+    await telegramClient.sendMessage(message.chat.id, text);
+  }
+});
+
+registerCommand({
+  name: 'help',
+  description: 'List all available commands',
+  category: 'Utility',
+  adminOnly: false,
+  usage: '/help',
+  execute: async (ctx) => {
+    const { message } = ctx;
+    if (!message.chat) return;
+
+    const userCommands: string[] = [];
+    const adminCommands: string[] = [];
+
+    commandRegistry.forEach((cmd) => {
+      const line = `/${cmd.name} — ${cmd.description}`;
+      if (cmd.adminOnly) {
+        adminCommands.push(line);
+      } else {
+        userCommands.push(line);
+      }
+    });
+
+    const text = [
+      `📖 Available Commands`,
+      ``,
+      `👤 Everyone:`,
+      ...userCommands.map(c => `  ${c}`),
+      ``,
+      `🛡️ Admins Only:`,
+      ...adminCommands.map(c => `  ${c}`),
+      ``,
+      `Tip: Use /ask <question> to chat with the AI about your community.`,
+    ].join('\n');
+
+    await telegramClient.sendMessage(message.chat.id, text);
+  }
+});
+
+registerCommand({
+  name: 'ping',
+  description: 'Check if the bot is online',
+  category: 'Utility',
+  adminOnly: false,
+  usage: '/ping',
+  execute: async (ctx) => {
+    const { message } = ctx;
+    if (!message.chat) return;
+
+    const uptime = process.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = Math.floor(uptime % 60);
+
+    await telegramClient.sendMessage(message.chat.id, `🏓 Pong! Bot is online.\n⏱️ Uptime: ${hours}h ${minutes}m ${seconds}s`);
+  }
+});
+
+// ─── Feature Commands ────────────────────────────────────────────
 registerCommand({
   name: 'reputation',
   description: 'View your current reputation score',
