@@ -302,7 +302,7 @@ registerCommand({
       
       import('../container').then(({ userRepo, moderationRepo }) => {
         userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(targetUser => {
-          moderationRepo.logAction({
+          moderationRepo.createAction({
             userId: targetUser.id,
             groupId: internalGroupId,
             moderatorId: internalUserId,
@@ -347,7 +347,7 @@ registerCommand({
       
       import('../container').then(({ userRepo, moderationRepo }) => {
         userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(targetUser => {
-          moderationRepo.logAction({
+          moderationRepo.createAction({
             userId: targetUser.id,
             groupId: internalGroupId,
             moderatorId: internalUserId,
@@ -390,7 +390,7 @@ registerCommand({
       
       import('../container').then(({ userRepo, moderationRepo, groupRepo }) => {
         userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username }).then(async targetUser => {
-          await moderationRepo.logAction({
+          await moderationRepo.createAction({
             userId: targetUser.id,
             groupId: internalGroupId,
             moderatorId: internalUserId,

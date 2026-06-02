@@ -41,7 +41,7 @@ export class SpamService {
 
       if (action === "WARN") {
         await telegramClient.sendMessage(telegramGroupId, `⚠️ User has been warned for spamming. (Velocity check breached)`);
-        await moderationRepo.logAction({
+        await moderationRepo.createAction({
           userId: internalUserId,
           groupId: internalGroupId,
           moderatorId: internalUserId, // System action, user is their own moderator for logs here or we use a system user
@@ -53,7 +53,7 @@ export class SpamService {
         const untilDate = Math.floor(Date.now() / 1000) + 3600; // 1 hour mute
         await telegramClient.restrictChatMember(telegramGroupId, telegramUserId, { can_send_messages: false }, untilDate);
         await telegramClient.sendMessage(telegramGroupId, `🔇 User has been automatically muted for 1 hour for spamming.`);
-        await moderationRepo.logAction({
+        await moderationRepo.createAction({
           userId: internalUserId,
           groupId: internalGroupId,
           moderatorId: internalUserId,
@@ -64,7 +64,7 @@ export class SpamService {
       else if (action === "BAN") {
         await telegramClient.banChatMember(telegramGroupId, telegramUserId);
         await telegramClient.sendMessage(telegramGroupId, `🔨 User has been automatically banned for severe spamming.`);
-        await moderationRepo.logAction({
+        await moderationRepo.createAction({
           userId: internalUserId,
           groupId: internalGroupId,
           moderatorId: internalUserId,
