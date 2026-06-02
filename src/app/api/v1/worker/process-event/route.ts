@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySignatureAppRouter } from '@upstash/qstash/dist/nextjs';
 import { logger } from '../../../../../lib/logger/pino';
 import { analyticsService } from '../../../../../services/container';
+import { verifyQStashSignature } from '../../../../../lib/qstash';
 import { EventLog } from '@prisma/client';
 
-async function handler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const requestId = crypto.randomUUID();
   try {
+    const isValid = await verifyQStashSignature(req);
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid QStash signature' }, { status: 401 });
+    }
+
     const event: EventLog = await req.json();
 
     logger.info({ requestId, eventId: event.id, eventType: event.eventType }, 'Processing event via QStash worker');
@@ -21,6 +26,3 @@ async function handler(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
-
-// Wrap with QStash signature verification for security
-export const POST = verifySignatureAppRouter(handler);

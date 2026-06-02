@@ -3,7 +3,7 @@ import { commandRegistry } from '../../services/command/registry';
 import '../../services/command/commands'; // Initialize commands
 import { logger } from '../logger/pino';
 import { eventLogRepo } from '../../services/container';
-import { qstashClient } from '../qstash';
+import { getQStashClient } from '../qstash';
 import { env } from '../../config/env';
 
 export class UpdateDispatcher {
@@ -28,7 +28,7 @@ export class UpdateDispatcher {
             });
             
             // Dispatch to async event processor
-            await qstashClient.publishJSON({
+            await getQStashClient().publishJSON({
               url: `${env.APP_URL}/api/v1/worker/process-event`,
               body: event,
             });
@@ -50,7 +50,7 @@ export class UpdateDispatcher {
         });
         
         // Dispatch to async event processor
-        await qstashClient.publishJSON({
+        await getQStashClient().publishJSON({
           url: `${env.APP_URL}/api/v1/worker/process-event`,
           body: event,
         });

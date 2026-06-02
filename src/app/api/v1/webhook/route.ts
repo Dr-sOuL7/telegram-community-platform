@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { env } from '../../../../config/env';
 import { logger } from '../../../../lib/logger/pino';
 import { TelegramUpdate } from '../../../../domain/types/telegram';
-import { qstashClient } from '../../../../lib/qstash';
+import { getQStashClient } from '../../../../lib/qstash';
 
 export async function POST(req: NextRequest) {
   const requestId = crypto.randomUUID();
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
 
     // Push the payload to QStash to be processed asynchronously by our worker.
     // We use the Telegram update_id as the deduplication ID so QStash guarantees exactly-once delivery.
-    await qstashClient.publishJSON({
+    const qstash = getQStashClient();
+    await qstash.publishJSON({
       url: `${env.APP_URL}/api/v1/worker/process-update`,
       body: update,
       deduplicationId: `tg-update-${update.update_id}`,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '../../../../../config/env';
 import { prisma } from '../../../../../db/prisma';
-import { qstashClient } from '../../../../../lib/qstash';
+import { getQStashClient } from '../../../../../lib/qstash';
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     const isMonthly = now.getDate() === 1;
 
     // Create an array of tasks for each group
+    const qstash = getQStashClient();
     const tasks = groups.flatMap(group => {
       const groupTasks = [{ url: `${env.APP_URL}/api/v1/worker/generate-report`, body: { groupId: group.id, reportType: 'DAILY' } }];
       if (isWeekly) groupTasks.push({ url: `${env.APP_URL}/api/v1/worker/generate-report`, body: { groupId: group.id, reportType: 'WEEKLY' } });
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < tasks.length; i += chunkSize) {
       const chunk = tasks.slice(i, i + chunkSize);
       await Promise.all(
-        chunk.map(msg => qstashClient.publishJSON(msg))
+        chunk.map(msg => qstash.publishJSON(msg))
       );
     }
 

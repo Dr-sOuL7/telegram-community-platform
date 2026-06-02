@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySignatureAppRouter } from '@upstash/qstash/dist/nextjs';
 import { logger } from '../../../../../lib/logger/pino';
 import { analyticsService } from '../../../../../services/container';
+import { verifyQStashSignature } from '../../../../../lib/qstash';
 
-async function handler(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
+    const isValid = await verifyQStashSignature(req);
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid QStash signature' }, { status: 401 });
+    }
+
     const { groupId }: { groupId: string } = await req.json();
 
     if (!groupId) {
@@ -21,5 +26,3 @@ async function handler(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
-
-export const POST = verifySignatureAppRouter(handler);
