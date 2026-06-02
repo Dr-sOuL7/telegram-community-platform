@@ -338,3 +338,44 @@ model CommandUsage {
   @@index([commandName])
   @@index([createdAt])
 }
+
+// ---------------------------------------------------------
+// PHASE 3 MODELS
+// ---------------------------------------------------------
+
+enum DashboardRole {
+  OWNER
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  VIEWER
+}
+
+model DashboardUser {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  name         String?
+  role         DashboardRole @default(VIEWER)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  auditLogs    DashboardAuditLog[]
+}
+
+model DashboardAuditLog {
+  id             String        @id @default(uuid())
+  dashboardUserId String
+  action         String
+  resourceType   String        // e.g., 'GROUP', 'USER', 'SETTINGS'
+  resourceId     String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  user DashboardUser @relation(fields: [dashboardUserId], references: [id])
+
+  @@index([dashboardUserId])
+  @@index([action])
+  @@index([createdAt])
+}

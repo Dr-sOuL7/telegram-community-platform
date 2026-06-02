@@ -16,6 +16,11 @@ export const envSchema = z.object({
   // Application URL (for webhook setup)
   APP_URL: z.string().url("APP_URL must be a valid URL").optional(),
 
+  // Auth Configuration
+  AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required"),
+  INITIAL_ADMIN_EMAIL: z.string().email().optional(),
+  INITIAL_ADMIN_PASSWORD: z.string().min(1).optional(),
+
   // Feature Flags
   FEATURE_ANALYTICS: z.coerce.boolean().default(false),
   FEATURE_REPORTS: z.coerce.boolean().default(false),
