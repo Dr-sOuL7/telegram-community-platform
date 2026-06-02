@@ -2,15 +2,7 @@
   "crons": [
     {
       "path": "/api/v1/cron/aggregate-metrics",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/v1/cron/refresh-health",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/v1/cron/generate-reports",
-      "schedule": "0 1 * * *"
     }
   ]
 }
