@@ -37,9 +37,9 @@ registerCommand({
     await telegramClient.sendMessage(message.chat.id, text, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🚀 Open Web Dashboard", web_app: { url: `${env.APP_URL}/dashboard` } }],
-          [{ text: "➕ Add Bot to your Group", url: `https://t.me/${botUsername}?startgroup=true` }],
-          [{ text: "📖 View Documentation", url: `${env.APP_URL}` }]
+          [{ text: "🌐 Visit Website", web_app: { url: `${env.APP_URL}` } }],
+          [{ text: "🏆 Global Leaderboards", web_app: { url: `${env.APP_URL}/public/leaderboard` } }],
+          [{ text: "➕ Add Bot to your Group", url: `https://t.me/${botUsername}?startgroup=true` }]
         ]
       }
     });
@@ -145,7 +145,7 @@ registerCommand({
     await telegramClient.sendMessage(message.chat.id, `❤️ Community Health Score: ${score}/100`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📊 View Detailed Analytics", web_app: { url: `${env.APP_URL}/dashboard/groups/${internalGroupId}` } }]
+          [{ text: "📊 View Public Analytics", web_app: { url: `${env.APP_URL}/public/groups/${internalGroupId}` } }]
         ]
       }
     });
@@ -177,7 +177,7 @@ registerCommand({
     await telegramClient.sendMessage(message.chat.id, text, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📊 View Detailed Analytics", web_app: { url: `${env.APP_URL}/dashboard/groups/${internalGroupId}` } }]
+          [{ text: "📊 View Public Analytics", web_app: { url: `${env.APP_URL}/public/groups/${internalGroupId}` } }]
         ]
       }
     });
