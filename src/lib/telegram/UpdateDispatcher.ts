@@ -5,6 +5,7 @@ import { logger } from '../logger/pino';
 import { eventLogRepo, groupRepo, userRepo } from '../../services/container';
 import { getQStashClient } from '../qstash';
 import { env } from '../../config/env';
+import { telegramClient } from './TelegramClient';
 
 export class UpdateDispatcher {
   async dispatch(update: TelegramUpdate, requestId: string): Promise<void> {
