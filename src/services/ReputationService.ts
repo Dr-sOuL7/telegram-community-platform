@@ -53,8 +53,8 @@ export class ReputationService {
       }
       
     } catch (error) {
-      ErrorService.handleError(error, { userId, groupId, delta });
-      throw new AppError('Failed to apply reputation change', ErrorCategory.DATABASE);
+      ErrorService.handle(error, undefined, { userId, groupId, delta });
+      throw new AppError(ErrorCategory.DATABASE, 'Failed to apply reputation change');
     }
   }
 
