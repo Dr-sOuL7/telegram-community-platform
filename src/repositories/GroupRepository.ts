@@ -25,4 +25,11 @@ export class GroupRepository {
       include: { settings: true },
     });
   }
+
+  async findById(id: string): Promise<(Group & { settings: GroupSettings | null }) | null> {
+    return prisma.group.findUnique({
+      where: { id },
+      include: { settings: true },
+    });
+  }
 }
