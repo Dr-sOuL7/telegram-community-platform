@@ -10,10 +10,8 @@ export default withSentryConfig(nextConfig, {
   project: "telegram-community-platform",
   silent: !process.env.CI,
   widenClientFileUpload: true,
-  reactComponentAnnotation: {
-    enabled: true,
-  },
   tunnelRoute: "/monitoring",
-  hideSourceMaps: true,
-  disableLogger: true,
+  sourcemaps: {
+    disable: false,
+  },
 });
