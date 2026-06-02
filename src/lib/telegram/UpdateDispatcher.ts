@@ -16,8 +16,10 @@ export class UpdateDispatcher {
       try {
         const user = await userRepo.upsert(
           BigInt(update.message.from.id),
-          update.message.from.first_name,
-          update.message.from.username
+          {
+            firstName: update.message.from.first_name,
+            username: update.message.from.username
+          }
         );
         internalUserId = user.id;
       } catch (err) {
