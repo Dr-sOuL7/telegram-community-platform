@@ -120,12 +120,15 @@ registerCommand({
     const { message, internalUserId } = ctx;
     if (!message.from || !message.chat || !internalUserId) return;
     
+    const firstName = message.from.first_name;
+    const chatId = message.chat.id;
+
     try {
       import('../../db/prisma').then(async ({ prisma }) => {
         const user = await prisma.user.findUnique({ where: { id: internalUserId } });
         if (!user) return;
         
-        await telegramClient.sendMessage(message.chat.id, `👤 **${message.from.first_name}**, your current reputation score is **${user.reputation}**.`);
+        await telegramClient.sendMessage(chatId, `👤 **${firstName}**, your current reputation score is **${user.reputation}**.`);
       });
     } catch (e) {}
   }
