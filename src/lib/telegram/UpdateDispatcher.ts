@@ -18,8 +18,11 @@ export class UpdateDispatcher {
         try {
           await command.execute({ message: update.message, requestId });
           
-          // Log command execution event
-          if (update.message.chat.id && update.message.from?.id) {
+          // Only log analytics events for group/supergroup chats, not private DMs
+          const chatType = update.message.chat.type;
+          const isGroup = chatType === 'group' || chatType === 'supergroup';
+
+          if (isGroup && update.message.chat.id && update.message.from?.id) {
             const event = await eventLogRepo.logEvent({
               groupId: update.message.chat.id.toString(),
               userId: update.message.from.id.toString(),
@@ -40,9 +43,13 @@ export class UpdateDispatcher {
         logger.debug({ requestId, commandName }, 'Command not found in registry');
       }
     } else if (update.message) {
-      logger.info({ requestId }, 'Received standard message, logging to event stream...');
-      
-      if (update.message.chat.id && update.message.from?.id) {
+      // Only track non-command messages in groups, ignore private DMs
+      const chatType = update.message.chat.type;
+      const isGroup = chatType === 'group' || chatType === 'supergroup';
+
+      if (isGroup && update.message.chat.id && update.message.from?.id) {
+        logger.info({ requestId }, 'Received standard message, logging to event stream...');
+
         const event = await eventLogRepo.logEvent({
           groupId: update.message.chat.id.toString(),
           userId: update.message.from.id.toString(),
