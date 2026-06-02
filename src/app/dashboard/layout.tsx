@@ -9,7 +9,8 @@ import {
   LayoutDashboard, 
   Command, 
   FileText,
-  History
+  History,
+  Sparkles
 } from "lucide-react";
 import { auth, signOut } from "@/lib/auth/auth";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
     { name: "Health", href: "/dashboard/health", icon: Activity },
     { name: "Reports", href: "/dashboard/reports", icon: FileText },
+    { name: "AI Intelligence", href: "/dashboard/ai", icon: Sparkles },
     { name: "Commands", href: "/dashboard/commands", icon: Command },
     { name: "Audit Log", href: "/dashboard/audit-log", icon: History },
     { name: "Settings", href: "/dashboard/settings", icon: Settings },

@@ -116,6 +116,13 @@ model Group {
   healthSnapshots   GroupHealthSnapshot[]
   reports           Report[]
   commandUsages     CommandUsage[]
+
+  // Phase 4 AI Relations
+  aiSettings        AISettings?
+  aiUsageLogs       AIUsageLog[]
+  conversationSummaries ConversationSummary[]
+  communityInsights CommunityInsight[]
+  recommendations   Recommendation[]
 }
 
 model GroupRole {
@@ -378,4 +385,102 @@ model DashboardAuditLog {
   @@index([dashboardUserId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------
+// PHASE 4 MODELS
+// ---------------------------------------------------------
+
+model AISettings {
+  id                      String   @id @default(uuid())
+  groupId                 String?  @unique  // null = global defaults
+  provider                String   @default("openai")
+  model                   String   @default("gpt-4o-mini")
+  enabled                 Boolean  @default(false)
+  maxTokens               Int      @default(2048)
+  temperature             Float    @default(0.7)
+  moderationEnabled       Boolean  @default(false)
+  summarizationEnabled    Boolean  @default(false)
+  insightsEnabled         Boolean  @default(false)
+  recommendationEnabled   Boolean  @default(false)
+  dailyCostLimitCents     Int      @default(100) // $1.00 daily limit
+  updatedAt               DateTime @updatedAt
+
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model AIUsageLog {
+  id               String   @id @default(uuid())
+  groupId          String?
+  feature          String   // 'summarization', 'insights', 'recommendations', 'assistant', 'health_explanation', 'report_enhancement'
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  estimatedCost    Float    // in USD cents
+  latencyMs        Int
+  success          Boolean
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+
+  group Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
+  @@index([feature])
+  @@index([createdAt])
+}
+
+model ConversationSummary {
+  id         String   @id @default(uuid())
+  groupId    String
+  title      String
+  summary    String   @db.Text
+  topics     Json?    // string[]
+  decisions  Json?    // string[]
+  actionItems Json?   // string[]
+  timeRangeStart DateTime
+  timeRangeEnd   DateTime
+  messageCount   Int
+  tokensUsed     Int
+  createdAt  DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([createdAt])
+}
+
+model CommunityInsight {
+  id         String   @id @default(uuid())
+  groupId    String
+  category   String   // 'engagement', 'moderation', 'growth', 'retention', 'activity'
+  insight    String   @db.Text
+  confidence Float    // 0.0 - 1.0
+  severity   String   @default("info") // 'info', 'warning', 'critical'
+  metadata   Json?
+  generatedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([category])
+  @@index([generatedAt])
+}
+
+model Recommendation {
+  id              String   @id @default(uuid())
+  groupId         String
+  category        String   // 'moderation', 'engagement', 'growth', 'retention', 'health'
+  recommendation  String   @db.Text
+  confidence      Float    // 0.0 - 1.0
+  priority        String   @default("medium") // 'low', 'medium', 'high', 'critical'
+  status          String   @default("pending") // 'pending', 'accepted', 'dismissed'
+  metadata        Json?
+  generatedAt     DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([category])
+  @@index([generatedAt])
 }

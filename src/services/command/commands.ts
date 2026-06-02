@@ -1,6 +1,7 @@
 import { registerCommand } from './registry';
 import { reputationService, healthScoreService, reportService, analyticsRepo } from '../container';
 import { telegramClient } from '../../lib/telegram/TelegramClient';
+import { summarizationService, aiAssistantService } from '../container';
 
 registerCommand({
   name: 'reputation',
@@ -53,5 +54,56 @@ registerCommand({
     
     const text = `📊 **Group Stats**\nMessages: ${stats.totalMessages}\nCommands: ${stats.totalCommands}\nWarnings: ${stats.warningsIssued}\nBans: ${stats.bansIssued}`;
     await telegramClient.sendMessage(message.chat.id, text);
+  }
+});
+
+registerCommand({
+  name: 'summary',
+  description: 'Get a summary of the group conversation for the last 24 hours',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/summary',
+  execute: async (ctx) => {
+    const { message } = ctx;
+    if (!message.chat) return;
+    
+    await telegramClient.sendMessage(message.chat.id, "🤖 Generating summary, this might take a moment...");
+    
+    try {
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const summary = await summarizationService.summarize(message.chat.id.toString(), yesterday, now);
+      await telegramClient.sendMessage(message.chat.id, summary);
+    } catch (e: any) {
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to generate summary: ${e.message}`);
+    }
+  }
+});
+
+registerCommand({
+  name: 'ask',
+  description: 'Ask the AI assistant a question about the group',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/ask <question>',
+  execute: async (ctx) => {
+    const { message } = ctx;
+    if (!message.chat || !message.text) return;
+    
+    const parts = message.text.split(' ');
+    if (parts.length < 2) {
+      await telegramClient.sendMessage(message.chat.id, "Please provide a question. Usage: /ask <question>");
+      return;
+    }
+    
+    const question = parts.slice(1).join(' ');
+    await telegramClient.sendMessage(message.chat.id, "🤖 Let me check...");
+    
+    try {
+      const answer = await aiAssistantService.answerQuestion(message.chat.id.toString(), question);
+      await telegramClient.sendMessage(message.chat.id, `🤖 **AI Assistant:**\n\n${answer}`);
+    } catch (e: any) {
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to get answer: ${e.message}`);
+    }
   }
 });

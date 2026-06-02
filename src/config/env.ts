@@ -25,8 +25,18 @@ export const envSchema = z.object({
   FEATURE_ANALYTICS: z.coerce.boolean().default(false),
   FEATURE_REPORTS: z.coerce.boolean().default(false),
   FEATURE_HEALTH_SCORE: z.coerce.boolean().default(false),
-  FEATURE_AI: z.coerce.boolean().default(false),
   FEATURE_REPUTATION: z.coerce.boolean().default(true),
+
+  // AI Configuration
+  GROQ_API_KEY: z.string().min(1).optional(),
+  
+  // AI Feature Flags
+  FEATURE_AI: z.coerce.boolean().default(false),
+  FEATURE_SUMMARIZATION: z.coerce.boolean().default(false),
+  FEATURE_AI_INSIGHTS: z.coerce.boolean().default(false),
+  FEATURE_AI_REPORTS: z.coerce.boolean().default(false),
+  FEATURE_AI_RECOMMENDATIONS: z.coerce.boolean().default(false),
+  FEATURE_AI_ASSISTANT: z.coerce.boolean().default(false),
 
   // Cron Security
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required to secure cron endpoints"),
