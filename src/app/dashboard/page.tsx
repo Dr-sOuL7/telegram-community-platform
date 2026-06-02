@@ -1,6 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/db/prisma";
-import { Users, MessageSquare, ShieldAlert, Activity } from "lucide-react";
+import { Users, MessageSquare, ShieldAlert, Activity, LayoutDashboard, TrendingUp } from "lucide-react";
+import { PageHeader } from "@/components/ui/premium/PageHeader";
+import { PremiumCard } from "@/components/ui/premium/PremiumCard";
+import { EmptyState } from "@/components/ui/premium/EmptyState";
 
 export default async function DashboardOverview() {
   const [
@@ -18,74 +20,79 @@ export default async function DashboardOverview() {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Overview</h2>
-        <p className="text-muted-foreground">High-level metrics across all Telegram communities.</p>
-      </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <PageHeader 
+        title="Global Overview" 
+        description="High-level metrics across all Telegram communities."
+        icon={<LayoutDashboard className="w-8 h-8" />}
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Groups</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalGroups}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <PremiumCard 
+          title="Active Groups" 
+          icon={<Users className="w-4 h-4" />}
+          className="hover:-translate-y-1"
+        >
+          <div className="text-3xl font-extrabold text-zinc-800 dark:text-zinc-100">{totalGroups}</div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium tracking-wide uppercase">Tracked Communities</p>
+        </PremiumCard>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tracked Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
-          </CardContent>
-        </Card>
+        <PremiumCard 
+          title="Tracked Users" 
+          icon={<Users className="w-4 h-4" />}
+          className="hover:-translate-y-1"
+        >
+          <div className="text-3xl font-extrabold text-zinc-800 dark:text-zinc-100">{totalUsers}</div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium tracking-wide uppercase">Across All Groups</p>
+        </PremiumCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Messages</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalMessages.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+        <PremiumCard 
+          title="Total Messages" 
+          icon={<MessageSquare className="w-4 h-4" />}
+          className="hover:-translate-y-1"
+        >
+          <div className="text-3xl font-extrabold text-zinc-800 dark:text-zinc-100">{totalMessages.toLocaleString()}</div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium tracking-wide uppercase">Analyzed Interactions</p>
+        </PremiumCard>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Health Score</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {avgHealth._avg.score ? avgHealth._avg.score.toFixed(1) : "N/A"}
-            </div>
-          </CardContent>
-        </Card>
+        <PremiumCard 
+          title="Avg Health Score" 
+          icon={<Activity className="w-4 h-4" />}
+          className="hover:-translate-y-1"
+        >
+          <div className="text-3xl font-extrabold text-zinc-800 dark:text-zinc-100">
+            {avgHealth._avg.score ? avgHealth._avg.score.toFixed(1) : "N/A"}
+          </div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium tracking-wide uppercase">Global Network Health</p>
+        </PremiumCard>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Detailed activity charts will render here via Recharts.</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+        <PremiumCard 
+          title="Recent Activity" 
+          icon={<TrendingUp className="w-5 h-5" />}
+          className="col-span-4"
+          contentClassName="p-0"
+        >
+          <EmptyState 
+            icon={<TrendingUp />}
+            title="Activity Data Generating"
+            description="Detailed activity charts will render here shortly."
+          />
+        </PremiumCard>
         
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Recent Moderation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Latest warnings, mutes, and bans.</p>
-          </CardContent>
-        </Card>
+        <PremiumCard 
+          title="Recent Moderation" 
+          icon={<ShieldAlert className="w-5 h-5" />}
+          className="col-span-3"
+          contentClassName="p-0"
+        >
+          <EmptyState 
+            icon={<ShieldAlert />}
+            title="No Recent Flags"
+            description="Latest warnings, mutes, and bans will appear here."
+          />
+        </PremiumCard>
       </div>
     </div>
   );

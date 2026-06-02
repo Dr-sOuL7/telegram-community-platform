@@ -1,9 +1,11 @@
 import { prisma } from "@/db/prisma";
 import { notFound } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Star } from "lucide-react";
+import { AlertCircle, Star, UserCircle, History, ShieldAlert } from "lucide-react";
+import { PageHeader } from "@/components/ui/premium/PageHeader";
+import { PremiumCard } from "@/components/ui/premium/PremiumCard";
+import { EmptyState } from "@/components/ui/premium/EmptyState";
 
 export default async function UserDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -18,99 +20,103 @@ export default async function UserDetailPage(props: { params: Promise<{ id: stri
   if (!user) return notFound();
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            {user.firstName} {user.username ? `(@${user.username})` : ""}
-          </h2>
-          <p className="text-muted-foreground font-mono text-sm">{user.telegramId.toString()}</p>
-        </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+        <PageHeader 
+          title={`${user.firstName} ${user.username ? `(@${user.username})` : ""}`}
+          description={`Telegram ID: ${user.telegramId.toString()}`}
+          icon={<UserCircle className="w-8 h-8" />}
+        />
         <div className="flex gap-2">
-           <Badge variant={user.isActive ? "default" : "destructive"}>
+           <Badge variant={user.isActive ? "default" : "destructive"} className={`px-3 py-1 text-sm font-semibold shadow-sm ${user.isActive ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}>
              {user.isActive ? "Active" : "Banned/Inactive"}
            </Badge>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reputation Score</CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{user.reputation}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Warnings</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{user.warnings}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <PremiumCard 
+          title="Reputation Score" 
+          icon={<Star className="w-4 h-4 text-amber-500" />}
+        >
+          <div className="text-3xl font-extrabold text-zinc-800 dark:text-zinc-100">{user.reputation}</div>
+        </PremiumCard>
+        
+        <PremiumCard 
+          title="Total Warnings" 
+          icon={<AlertCircle className="w-4 h-4 text-red-500" />}
+        >
+          <div className="text-3xl font-extrabold text-red-600 dark:text-red-500">{user.warnings}</div>
+        </PremiumCard>
       </div>
 
-      <Tabs defaultValue="history" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="history">Reputation History</TabsTrigger>
-          <TabsTrigger value="moderation">Moderation Events</TabsTrigger>
+      <Tabs defaultValue="history" className="space-y-6">
+        <TabsList className="bg-zinc-100/80 dark:bg-zinc-900/80 backdrop-blur-md p-1">
+          <TabsTrigger value="history" className="data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-700 dark:data-[state=active]:text-purple-400">Reputation History</TabsTrigger>
+          <TabsTrigger value="moderation" className="data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-700 dark:data-[state=active]:text-purple-400">Moderation Events</TabsTrigger>
         </TabsList>
+        
         <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Reputation Changes</CardTitle>
-            </CardHeader>
-            <CardContent>
-               {user.reputationHistory.length === 0 ? (
-                 <p className="text-sm text-muted-foreground">No reputation events yet.</p>
-               ) : (
-                 <ul className="space-y-4 text-sm">
-                   {user.reputationHistory.map((h) => (
-                     <li key={h.id} className="flex justify-between items-center border-b pb-2">
-                       <div>
-                         <span className="font-semibold">{h.sourceType}</span>
-                         {h.reason && <span className="text-muted-foreground ml-2">({h.reason})</span>}
-                       </div>
-                       <div className={`font-bold ${h.delta > 0 ? "text-green-500" : "text-destructive"}`}>
-                         {h.delta > 0 ? "+" : ""}{h.delta}
-                       </div>
-                     </li>
-                   ))}
-                 </ul>
-               )}
-            </CardContent>
-          </Card>
+          <PremiumCard 
+            title="Recent Reputation Changes" 
+            icon={<History className="w-5 h-5" />}
+            contentClassName="p-0"
+          >
+             {user.reputationHistory.length === 0 ? (
+               <EmptyState 
+                 icon={<Star />}
+                 title="No Reputation History"
+                 description="This user has not received any reputation points yet."
+               />
+             ) : (
+               <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                 {user.reputationHistory.map((h) => (
+                   <li key={h.id} className="p-4 flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                     <div>
+                       <span className="font-semibold text-zinc-800 dark:text-zinc-200">{h.sourceType}</span>
+                       {h.reason && <span className="text-zinc-500 dark:text-zinc-400 ml-2 text-sm">({h.reason})</span>}
+                     </div>
+                     <Badge className={`font-bold border-0 shadow-sm ${h.delta > 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200"}`}>
+                       {h.delta > 0 ? "+" : ""}{h.delta}
+                     </Badge>
+                   </li>
+                 ))}
+               </ul>
+             )}
+          </PremiumCard>
         </TabsContent>
+
         <TabsContent value="moderation">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Moderation Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-               {user.receivedEvents.length === 0 ? (
-                 <p className="text-sm text-muted-foreground">Clean record.</p>
-               ) : (
-                 <ul className="space-y-4 text-sm">
-                   {user.receivedEvents.map((e) => (
-                     <li key={e.id} className="flex justify-between items-center border-b pb-2">
-                       <div>
-                         <Badge variant="outline" className="mr-2">{e.actionType}</Badge>
-                         <span>in {e.group.groupName}</span>
-                         {e.reason && <span className="text-muted-foreground ml-2">Reason: {e.reason}</span>}
+          <PremiumCard 
+            title="Recent Moderation Actions" 
+            icon={<ShieldAlert className="w-5 h-5" />}
+            contentClassName="p-0"
+          >
+             {user.receivedEvents.length === 0 ? (
+               <EmptyState 
+                 icon={<ShieldAlert />}
+                 title="Clean Record"
+                 description="This user has not been involved in any moderation events."
+               />
+             ) : (
+               <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                 {user.receivedEvents.map((e) => (
+                   <li key={e.id} className="p-4 flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                     <div className="space-y-1">
+                       <div className="flex items-center gap-2">
+                         <Badge variant="outline" className={`border-purple-500/20 ${e.actionType === 'BAN' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'}`}>{e.actionType}</Badge>
+                         <span className="text-sm text-zinc-600 dark:text-zinc-300">in <span className="font-medium text-zinc-800 dark:text-zinc-200">{e.group.groupName}</span></span>
                        </div>
-                       <div className="text-muted-foreground text-xs">
-                         {new Date(e.createdAt).toLocaleDateString()}
-                       </div>
-                     </li>
-                   ))}
-                 </ul>
-               )}
-            </CardContent>
-          </Card>
+                       {e.reason && <p className="text-sm text-zinc-500 dark:text-zinc-400 flex items-start gap-1.5 mt-1"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" /><span>{e.reason}</span></p>}
+                     </div>
+                     <div className="text-xs font-medium text-zinc-400 dark:text-zinc-500 text-right">
+                       {new Date(e.createdAt).toLocaleDateString()}
+                     </div>
+                   </li>
+                 ))}
+               </ul>
+             )}
+          </PremiumCard>
         </TabsContent>
       </Tabs>
     </div>

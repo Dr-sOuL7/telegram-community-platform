@@ -1,6 +1,8 @@
 import { prisma } from "@/db/prisma";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnalyticsChart } from "./AnalyticsChart"; 
+import { PageHeader } from "@/components/ui/premium/PageHeader";
+import { PremiumCard } from "@/components/ui/premium/PremiumCard";
+import { BarChart3, Activity } from "lucide-react";
 
 export default async function AnalyticsDashboard() {
   const dailyMetrics = await prisma.dailyMetrics.findMany({
@@ -22,21 +24,22 @@ export default async function AnalyticsDashboard() {
   const chartData = Array.from(chartDataMap.values());
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Analytics</h2>
-        <p className="text-muted-foreground">Platform-wide trends and volume analysis.</p>
-      </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <PageHeader 
+        title="Analytics Engine" 
+        description="Platform-wide trends, volume analysis, and historical trajectory."
+        icon={<BarChart3 className="w-8 h-8" />}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Global Message Volume (Daily)</CardTitle>
-          <CardDescription>Aggregated across all tracked communities</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="grid gap-6">
+        <PremiumCard 
+          title="Global Message Volume (Daily)" 
+          description="Aggregated across all tracked communities"
+          icon={<Activity className="w-5 h-5" />}
+        >
            <AnalyticsChart data={chartData} />
-        </CardContent>
-      </Card>
+        </PremiumCard>
+      </div>
     </div>
   );
 }
