@@ -294,7 +294,7 @@ registerCommand({
       return;
     }
 
-    const reason = message.text.split(' ').slice(1).join(' ') || 'No reason provided';
+    const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
 
     try {
       await telegramClient.banChatMember(message.chat.id, target.id);
@@ -338,7 +338,7 @@ registerCommand({
       return;
     }
 
-    const reason = message.text.split(' ').slice(1).join(' ') || 'No reason provided';
+    const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
     const untilDate = Math.floor(Date.now() / 1000) + 3600; // 1 hour
 
     try {
@@ -383,7 +383,7 @@ registerCommand({
       return;
     }
 
-    const reason = message.text.split(' ').slice(1).join(' ') || 'No reason provided';
+    const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
 
     try {
       await telegramClient.sendMessage(message.chat.id, `⚠️ **${target.first_name}**, you have been warned.\nReason: ${reason}`);
