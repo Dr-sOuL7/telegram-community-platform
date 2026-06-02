@@ -43,7 +43,18 @@ export class AIOrchestrator {
     } catch (error: any) {
       // Track Failure
       await this.usageTracker.trackError(groupId, feature, request.model || "unknown", error.message);
-      throw error;
+      
+      // Graceful degradation: Instead of crashing the parent process (e.g. analytics generation),
+      // we log the error and return a fallback response. This prevents a temporary 429 Rate Limit
+      // from breaking the entire application.
+      return {
+        model: request.model || "unknown",
+        content: "AI service is currently unavailable or rate limited. Please try again later.",
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: 0
+      };
     }
   }
 }

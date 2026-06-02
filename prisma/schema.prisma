@@ -94,6 +94,8 @@ model User {
   reputationHistory ReputationHistory[]
   userActivities    UserActivity[]
   commandUsages     CommandUsage[]
+
+  @@index([reputation(sort: Desc)])
 }
 
 model Group {
@@ -174,6 +176,25 @@ model Message {
   @@index([groupId])
   @@index([userId])
   @@index([createdAt])
+  @@index([groupId, createdAt])
+}
+
+model MessageArchive {
+  id               String     @id @default(uuid())
+  userId           String
+  groupId          String
+  messageId        BigInt
+  replyToMessageId BigInt?
+  messageText      String
+  isEdited         Boolean    @default(false)
+  senderType       SenderType @default(USER)
+  createdAt        DateTime
+  archivedAt       DateTime   @default(now())
+
+  // Note: No relations to Group/User to preserve integrity if they are deleted,
+  // or you could add relations. For long-term archive, it's often better to just store raw IDs
+  // but let's keep relation for schema consistency if needed, but we use String.
+  @@index([groupId, createdAt])
 }
 
 model ModerationAction {
@@ -206,6 +227,7 @@ model EventLog {
 
   @@index([groupId, eventType])
   @@index([createdAt])
+  @@index([groupId, createdAt])
 }
 
 // ---------------------------------------------------------

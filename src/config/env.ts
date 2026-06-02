@@ -40,6 +40,11 @@ export const envSchema = z.object({
 
   // Cron Security
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required to secure cron endpoints"),
+
+  // Upstash QStash
+  QSTASH_TOKEN: z.string().min(1, "QSTASH_TOKEN is required").optional(),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().min(1).optional(),
+  QSTASH_NEXT_SIGNING_KEY: z.string().min(1).optional(),
 });
 
 // We parse process.env when this module is imported to fail fast if env vars are missing

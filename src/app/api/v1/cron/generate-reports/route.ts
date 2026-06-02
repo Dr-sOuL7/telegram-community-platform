@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '../../../../../config/env';
-import { reportService } from '../../../../../services/container';
 import { prisma } from '../../../../../db/prisma';
+import { qstashClient } from '../../../../../lib/qstash';
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -11,22 +11,32 @@ export async function POST(req: NextRequest) {
 
   try {
     const groups = await prisma.group.findMany({ select: { id: true } });
-    for (const group of groups) {
-      await reportService.generateReport(group.id, 'DAILY');
-      
-      // On Sundays, generate weekly report
-      const now = new Date();
-      if (now.getDay() === 0) {
-        await reportService.generateReport(group.id, 'WEEKLY');
-      }
-      
-      // On the 1st of the month, generate monthly report
-      if (now.getDate() === 1) {
-        await reportService.generateReport(group.id, 'MONTHLY');
-      }
+    if (groups.length === 0) {
+      return NextResponse.json({ success: true, groupsProcessed: 0 });
     }
-    return NextResponse.json({ success: true, groupsProcessed: groups.length });
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    
+    const now = new Date();
+    const isWeekly = now.getDay() === 0;
+    const isMonthly = now.getDate() === 1;
+
+    // Create an array of tasks for each group
+    const tasks = groups.flatMap(group => {
+      const groupTasks = [{ url: `${env.APP_URL}/api/v1/worker/generate-report`, body: { groupId: group.id, reportType: 'DAILY' } }];
+      if (isWeekly) groupTasks.push({ url: `${env.APP_URL}/api/v1/worker/generate-report`, body: { groupId: group.id, reportType: 'WEEKLY' } });
+      if (isMonthly) groupTasks.push({ url: `${env.APP_URL}/api/v1/worker/generate-report`, body: { groupId: group.id, reportType: 'MONTHLY' } });
+      return groupTasks;
+    });
+
+    const chunkSize = 50;
+    for (let i = 0; i < tasks.length; i += chunkSize) {
+      const chunk = tasks.slice(i, i + chunkSize);
+      await Promise.all(
+        chunk.map(msg => qstashClient.publishJSON(msg))
+      );
+    }
+
+    return NextResponse.json({ success: true, reportsEnqueued: tasks.length });
+  } catch (error: any) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) || 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       await healthScoreService.calculateAndStoreHealth(group.id);
     }
     return NextResponse.json({ success: true, groupsProcessed: groups.length });
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) || 'Internal Server Error' }, { status: 500 });
   }
 }

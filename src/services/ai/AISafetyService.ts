@@ -51,16 +51,33 @@ export class AISafetyService {
 
   detectPromptInjection(input: string): boolean {
     const lower = input.toLowerCase();
+    
+    // Level 2 Validation: Check for common injection patterns and bypass techniques
     const patterns = [
-      "ignore all previous instructions",
-      "ignore previous instructions",
+      "ignore all previous",
       "disregard previous",
       "you are now",
-      "forget what i told you",
+      "forget what",
       "system prompt",
       "bypass",
+      "dan",
+      "do anything now",
+      "ignore the above",
+      "developer mode",
+      "from now on",
+      "roleplay",
+      "pretend",
+      "base64",
+      "```",
     ];
 
-    return patterns.some(p => lower.includes(p));
+    // High heuristic match
+    const containsPattern = patterns.some(p => lower.includes(p));
+    
+    // Entropy / length check to prevent massive copy-paste attacks targeting context window overflow
+    // although ContextBuilder limits length, the user prompt length should also be bounded
+    const isSuspiciouslyLong = input.length > 5000;
+
+    return containsPattern || isSuspiciouslyLong;
   }
 }

@@ -2,7 +2,9 @@ import { TelegramUpdate } from '../../domain/types/telegram';
 import { commandRegistry } from '../../services/command/registry';
 import '../../services/command/commands'; // Initialize commands
 import { logger } from '../logger/pino';
-import { eventLogRepo, analyticsService } from '../../services/container';
+import { eventLogRepo } from '../../services/container';
+import { qstashClient } from '../qstash';
+import { env } from '../../config/env';
 
 export class UpdateDispatcher {
   async dispatch(update: TelegramUpdate, requestId: string): Promise<void> {
@@ -24,7 +26,12 @@ export class UpdateDispatcher {
               eventType: 'COMMAND_EXECUTED',
               metadata: { commandName }
             });
-            await analyticsService.processEvent(event);
+            
+            // Dispatch to async event processor
+            await qstashClient.publishJSON({
+              url: `${env.APP_URL}/api/v1/worker/process-event`,
+              body: event,
+            });
           }
         } catch (error) {
           logger.error({ requestId, commandName, err: error }, 'Command execution failed');
@@ -41,7 +48,12 @@ export class UpdateDispatcher {
           userId: update.message.from.id.toString(),
           eventType: 'MESSAGE_SENT'
         });
-        await analyticsService.processEvent(event);
+        
+        // Dispatch to async event processor
+        await qstashClient.publishJSON({
+          url: `${env.APP_URL}/api/v1/worker/process-event`,
+          body: event,
+        });
       }
     }
   }

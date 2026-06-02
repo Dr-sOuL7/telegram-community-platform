@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grou
       select: { reputation: true, reputationLevel: true, warnings: true }
     });
     return NextResponse.json(user || { error: 'User not found' });
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) || 'Internal Server Error' }, { status: 500 });
   }
 }
