@@ -281,7 +281,7 @@ registerCommand({
   usage: '/ban [reason]',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat || !internalGroupId || !internalUserId) return;
+    if (!message.chat || !internalGroupId || !internalUserId || !message.from) return;
 
     if (!(await isUserAdmin(message.chat.id, message.from.id))) {
       await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
@@ -325,7 +325,7 @@ registerCommand({
   usage: '/mute [reason]',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat || !internalGroupId || !internalUserId) return;
+    if (!message.chat || !internalGroupId || !internalUserId || !message.from) return;
 
     if (!(await isUserAdmin(message.chat.id, message.from.id))) {
       await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
@@ -370,7 +370,7 @@ registerCommand({
   usage: '/warn [reason]',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat || !internalGroupId || !internalUserId) return;
+    if (!message.chat || !internalGroupId || !internalUserId || !message.from) return;
 
     if (!(await isUserAdmin(message.chat.id, message.from.id))) {
       await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
@@ -421,7 +421,7 @@ registerCommand({
   usage: '/delete',
   execute: async (ctx) => {
     const { message } = ctx;
-    if (!message.chat) return;
+    if (!message.chat || !message.from) return;
 
     if (!(await isUserAdmin(message.chat.id, message.from.id))) {
       await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
