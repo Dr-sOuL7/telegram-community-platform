@@ -3,6 +3,8 @@ import { TelegramMessage } from '../../domain/types/telegram';
 export interface CommandContext {
   message: TelegramMessage;
   requestId: string;
+  internalGroupId?: string;
+  internalUserId?: string;
 }
 
 export interface Command {

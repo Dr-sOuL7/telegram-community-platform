@@ -8,6 +8,8 @@ import { AIUsageRepository } from '../repositories/AIUsageRepository';
 import { ConversationSummaryRepository } from '../repositories/ConversationSummaryRepository';
 import { CommunityInsightRepository } from '../repositories/CommunityInsightRepository';
 import { RecommendationRepository } from '../repositories/RecommendationRepository';
+import { GroupRepository } from '../repositories/GroupRepository';
+import { UserRepository } from '../repositories/UserRepository';
 
 import { ReputationService } from './ReputationService';
 import { AnalyticsAggregationService } from './AnalyticsAggregationService';
@@ -35,6 +37,8 @@ export const analyticsRepo = new AnalyticsRepository();
 export const healthRepo = new HealthSnapshotRepository();
 export const reportRepo = new ReportRepository();
 export const eventLogRepo = new EventLogRepository();
+export const groupRepo = new GroupRepository();
+export const userRepo = new UserRepository();
 
 // AI Repositories
 export const aiSettingsRepo = new AISettingsRepository();

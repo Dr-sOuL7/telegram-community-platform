@@ -118,10 +118,15 @@ registerCommand({
   adminOnly: false,
   usage: '/health',
   execute: async (ctx) => {
-    const { message } = ctx;
+    const { message, internalGroupId } = ctx;
     if (!message.chat) return;
     
-    const health = await healthScoreService.getLatestScore(message.chat.id.toString());
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "This command can only be used in a group.");
+      return;
+    }
+    
+    const health = await healthScoreService.getLatestScore(internalGroupId);
     const score = health?.score || 'N/A';
     
     await telegramClient.sendMessage(message.chat.id, `❤️ Community Health Score: ${score}/100`);
@@ -135,10 +140,15 @@ registerCommand({
   adminOnly: true,
   usage: '/groupstats',
   execute: async (ctx) => {
-    const { message } = ctx;
+    const { message, internalGroupId } = ctx;
     if (!message.chat) return;
     
-    const stats = await analyticsRepo.getGroupMetrics(message.chat.id.toString());
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "This command can only be used in a group.");
+      return;
+    }
+    
+    const stats = await analyticsRepo.getGroupMetrics(internalGroupId);
     if (!stats) {
       await telegramClient.sendMessage(message.chat.id, 'No stats available yet.');
       return;
@@ -156,15 +166,20 @@ registerCommand({
   adminOnly: true,
   usage: '/summary',
   execute: async (ctx) => {
-    const { message } = ctx;
+    const { message, internalGroupId } = ctx;
     if (!message.chat) return;
+    
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "This command can only be used in a group.");
+      return;
+    }
     
     await telegramClient.sendMessage(message.chat.id, "🤖 Generating summary, this might take a moment...");
     
     try {
       const now = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const summary = await summarizationService.summarize(message.chat.id.toString(), yesterday, now);
+      const summary = await summarizationService.summarize(internalGroupId, yesterday, now);
       await telegramClient.sendMessage(message.chat.id, summary);
     } catch (e: any) {
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to generate summary: ${e.message}`);
@@ -179,8 +194,13 @@ registerCommand({
   adminOnly: true,
   usage: '/ask <question>',
   execute: async (ctx) => {
-    const { message } = ctx;
+    const { message, internalGroupId } = ctx;
     if (!message.chat || !message.text) return;
+    
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "This command can only be used in a group.");
+      return;
+    }
     
     const parts = message.text.split(' ');
     if (parts.length < 2) {
@@ -192,7 +212,7 @@ registerCommand({
     await telegramClient.sendMessage(message.chat.id, "🤖 Let me check...");
     
     try {
-      const answer = await aiAssistantService.answerQuestion(message.chat.id.toString(), question);
+      const answer = await aiAssistantService.answerQuestion(internalGroupId, question);
       await telegramClient.sendMessage(message.chat.id, `🤖 **AI Assistant:**\n\n${answer}`);
     } catch (e: any) {
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to get answer: ${e.message}`);
