@@ -20,23 +20,32 @@ export class AISafetyService {
       throw new AppError(ErrorCategory.VALIDATION, `Feature ${featureFlag} is disabled in environment.`);
     }
 
-    // 3. Check Settings overrides
-    const settings = groupId ? await this.aiSettingsRepo.getEffectiveSettings(groupId) : await this.aiSettingsRepo.getGlobalSettings();
-    if (!settings || !settings.enabled) {
+    // 3. Check Settings overrides (fallback to env defaults if not set)
+    const dbSettings = groupId ? await this.aiSettingsRepo.getEffectiveSettings(groupId) : await this.aiSettingsRepo.getGlobalSettings();
+    
+    const effectiveSettings = dbSettings || {
+      enabled: env.FEATURE_AI,
+      summarizationEnabled: env.FEATURE_SUMMARIZATION,
+      insightsEnabled: env.FEATURE_AI_INSIGHTS,
+      recommendationEnabled: env.FEATURE_AI_RECOMMENDATIONS,
+      dailyCostLimitCents: 100
+    };
+
+    if (!effectiveSettings.enabled) {
       throw new AppError(ErrorCategory.VALIDATION, "AI is disabled in group/global settings.");
     }
 
     switch(featureFlag) {
-      case 'FEATURE_SUMMARIZATION': if (!settings.summarizationEnabled) throw new AppError(ErrorCategory.VALIDATION, "Summarization disabled."); break;
-      case 'FEATURE_AI_INSIGHTS': if (!settings.insightsEnabled) throw new AppError(ErrorCategory.VALIDATION, "Insights disabled."); break;
-      case 'FEATURE_AI_RECOMMENDATIONS': if (!settings.recommendationEnabled) throw new AppError(ErrorCategory.VALIDATION, "Recommendations disabled."); break;
+      case 'FEATURE_SUMMARIZATION': if (!effectiveSettings.summarizationEnabled) throw new AppError(ErrorCategory.VALIDATION, "Summarization disabled."); break;
+      case 'FEATURE_AI_INSIGHTS': if (!effectiveSettings.insightsEnabled) throw new AppError(ErrorCategory.VALIDATION, "Insights disabled."); break;
+      case 'FEATURE_AI_RECOMMENDATIONS': if (!effectiveSettings.recommendationEnabled) throw new AppError(ErrorCategory.VALIDATION, "Recommendations disabled."); break;
     }
 
     // 4. Check Cost Ceilings
     const today = new Date();
     const currentCost = await this.aiUsageRepo.getDailyCostCents(today, groupId);
-    if (currentCost >= settings.dailyCostLimitCents) {
-      throw new AppError(ErrorCategory.VALIDATION, `Daily AI cost limit reached. (${currentCost} / ${settings.dailyCostLimitCents} cents)`);
+    if (currentCost >= effectiveSettings.dailyCostLimitCents) {
+      throw new AppError(ErrorCategory.VALIDATION, `Daily AI cost limit reached. (${currentCost} / ${effectiveSettings.dailyCostLimitCents} cents)`);
     }
   }
 
