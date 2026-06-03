@@ -7,7 +7,12 @@ import { getSystemUserId } from "../system/SystemUser";
 export class SpamService {
   /**
    * Checks if a user is sending messages too fast and punishes them if so.
-   * This is a CRITICAL operation — runs synchronously in the dispatch path.
+   *
+   * CRITICAL: runs synchronously in the dispatch path and PROPAGATES errors.
+   * A DB failure here must fail the worker so QStash retries — losing a
+   * moderation action silently is unacceptable for the audit trail. The only
+   * swallowed failure is the terminal SPAM_DETECTED event log (analytics),
+   * which is also kept LAST so a retry cannot duplicate the moderation action.
    */
   async checkVelocityAndPunish(
     internalGroupId: string,
@@ -15,11 +20,11 @@ export class SpamService {
     telegramGroupId: bigint,
     telegramUserId: bigint
   ): Promise<void> {
-    try {
-      // 1. Get Group Settings
-      const group = await groupRepo.findById(internalGroupId);
-      if (!group || !group.settings?.antiSpamEnabled) return;
+    // 1. Get Group Settings
+    const group = await groupRepo.findById(internalGroupId);
+    if (!group || !group.settings?.antiSpamEnabled) return;
 
+    try {
       const settings = group.settings;
       const thresholdMsg = settings.spamThresholdMsg || 5;
       const thresholdTime = settings.spamThresholdTime || 10; // seconds
@@ -79,18 +84,27 @@ export class SpamService {
         });
       }
 
-      // Log the spam detection event (non-critical, but we're already in the try block)
-      await prisma.eventLog.create({
-        data: {
-          groupId: internalGroupId,
-          userId: internalUserId,
-          eventType: "SPAM_DETECTED",
-          metadata: { reason, action }
-        }
-      });
+      // ─── NON-CRITICAL: spam-detection event log (analytics) ──────
+      // Swallowed, and kept LAST so a worker retry cannot duplicate the
+      // moderation action created above.
+      try {
+        await prisma.eventLog.create({
+          data: {
+            groupId: internalGroupId,
+            userId: internalUserId,
+            eventType: "SPAM_DETECTED",
+            metadata: { reason, action }
+          }
+        });
+      } catch (eventErr) {
+        logger.error({ eventErr, internalGroupId, internalUserId }, 'Non-critical: failed to log SPAM_DETECTED event');
+      }
 
     } catch (error) {
-      logger.error({ error, internalGroupId, internalUserId }, 'Failed to check spam velocity');
+      // CRITICAL: propagate so the worker returns 500 and QStash retries.
+      // Losing an auto-moderation action silently is not acceptable.
+      logger.error({ error, internalGroupId, internalUserId }, 'Spam velocity check failed — failing update for retry');
+      throw error;
     }
   }
 }

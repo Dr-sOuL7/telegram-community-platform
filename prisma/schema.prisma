@@ -179,7 +179,10 @@ model Message {
   user  User  @relation(fields: [userId], references: [id])
   group Group @relation(fields: [groupId], references: [id])
 
-  @@index([groupId])
+  // Natural idempotency key: Telegram message_id is unique per chat. This lets
+  // the update worker re-run safely on QStash retries without duplicating rows
+  // (duplicates would also inflate SpamService velocity counts → false bans).
+  @@unique([groupId, messageId])
   @@index([userId])
   @@index([createdAt])
   @@index([groupId, createdAt])

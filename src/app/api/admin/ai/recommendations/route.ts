@@ -1,19 +1,29 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/auth";
+import { requireApiRole, ADMIN_ROLES } from "@/lib/auth/dal";
+import { recordDashboardAction } from "@/lib/auth/audit";
 import { aiRecommendationService } from "@/services/container";
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // AI generation incurs real cost — restrict to admin tiers (not VIEWER/MODERATOR).
+    const gate = await requireApiRole(ADMIN_ROLES);
+    if ("response" in gate) return gate.response;
 
     const { groupId } = await request.json();
     if (!groupId) return NextResponse.json({ error: "groupId is required" }, { status: 400 });
 
     await aiRecommendationService.generateRecommendations(groupId);
 
+    await recordDashboardAction({
+      dashboardUserId: gate.user.id,
+      action: "AI_RECOMMENDATIONS_GENERATED",
+      resourceType: "GROUP",
+      resourceId: groupId,
+    });
+
     return NextResponse.json({ success: true, message: "Recommendations generated successfully" });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

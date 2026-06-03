@@ -42,6 +42,15 @@ export class AISafetyService {
     }
 
     // 4. Check Cost Ceilings
+    //
+    // KNOWN LIMITATION (check-then-act): this reads *prior* spend and does not
+    // reserve the cost of the request about to run, so the cap can be exceeded
+    // by (a) one request's worth of cost (we can't pre-estimate tokens), and
+    // (b) concurrent requests that both read "under limit" before either logs.
+    // It is also per-group/global scoped — there is no platform-wide ceiling.
+    // A precise fix needs an atomic counter (e.g. an Upstash Redis token-bucket
+    // keyed by group+day). Tracked for follow-up; acceptable for now because AI
+    // calls per group are infrequent and admin-triggered.
     const today = new Date();
     const currentCost = await this.aiUsageRepo.getDailyCostCents(today, groupId);
     if (currentCost >= effectiveSettings.dailyCostLimitCents) {
@@ -50,34 +59,33 @@ export class AISafetyService {
   }
 
   detectPromptInjection(input: string): boolean {
-    const lower = input.toLowerCase();
-    
-    // Level 2 Validation: Check for common injection patterns and bypass techniques
-    const patterns = [
-      "ignore all previous",
-      "disregard previous",
-      "you are now",
-      "forget what",
-      "system prompt",
-      "bypass",
-      "dan",
-      "do anything now",
-      "ignore the above",
-      "developer mode",
-      "from now on",
-      "roleplay",
-      "pretend",
-      "base64",
-      "```",
+    // Length guard against context-window-overflow / massive-paste attacks.
+    if (input.length > 5000) return true;
+
+    const normalized = input.toLowerCase();
+
+    // High-signal injection phrases, WORD-BOUNDARY anchored.
+    //
+    // The previous implementation used substring `includes()` on short tokens
+    // like "dan", "bypass", "pretend", "roleplay", and "```". Those match inside
+    // ordinary words ("abun-dan-t", "Su-dan") and appear constantly in normal
+    // community chat (code blocks especially), so summarization of legitimate
+    // groups was being rejected as "prompt injection". We now match only
+    // canonical multi-word injection phrases, which are inherently low-false-
+    // positive, via anchored regexes.
+    const patterns: RegExp[] = [
+      /\bignore (all |the )?(previous|above|prior)\b/,
+      /\bdisregard (all |the )?(previous|above|prior)\b/,
+      /\bforget (everything|what|all|the above|previous|your)\b/,
+      /\byou are now\b/,
+      /\bact as (an? )?(dan|jailbreak)\b/,
+      /\bdo anything now\b/,
+      /\bdeveloper mode\b/,
+      /\b(reveal|show|print|repeat|output)\b.{0,24}\b(system|initial|original)\b.{0,12}\b(prompt|instructions?)\b/,
+      /\bnew instructions?\s*:/,
+      /\boverride (your|the) (instructions?|rules?|guardrails?|prompt)\b/,
     ];
 
-    // High heuristic match
-    const containsPattern = patterns.some(p => lower.includes(p));
-    
-    // Entropy / length check to prevent massive copy-paste attacks targeting context window overflow
-    // although ContextBuilder limits length, the user prompt length should also be bounded
-    const isSuspiciouslyLong = input.length > 5000;
-
-    return containsPattern || isSuspiciouslyLong;
+    return patterns.some((re) => re.test(normalized));
   }
 }

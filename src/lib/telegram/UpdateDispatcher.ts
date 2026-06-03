@@ -29,7 +29,10 @@ export class UpdateDispatcher {
         );
         internalUserId = user.id;
       } catch (err) {
-        logger.error({ err, telegramId: update.message.from.id }, 'Failed to upsert user');
+        // CRITICAL: every downstream step depends on internalUserId. Rethrow so
+        // the worker returns 500 and QStash retries (upsert is idempotent).
+        logger.error({ err, telegramId: update.message.from.id }, 'CRITICAL: Failed to upsert user — failing update for retry');
+        throw err;
       }
     }
 
@@ -44,7 +47,9 @@ export class UpdateDispatcher {
         );
         internalGroupId = group.id;
       } catch (err) {
-        logger.error({ err, telegramGroupId: update.message.chat.id }, 'Failed to upsert group');
+        // CRITICAL: group resolution gates moderation/persistence. Rethrow for retry.
+        logger.error({ err, telegramGroupId: update.message.chat.id }, 'CRITICAL: Failed to upsert group — failing update for retry');
+        throw err;
       }
     }
 
@@ -118,35 +123,50 @@ export class UpdateDispatcher {
 
     if (update.message) {
       if (isGroup && internalGroupId && internalUserId) {
-        // Spam detection is critical — it's a moderation action
         const telegramGroupId = update.message.chat.id;
         const telegramUserId = update.message.from?.id;
-        if (telegramGroupId && telegramUserId) {
+
+        // ─── CRITICAL: Persist message FIRST ─────────────────────────
+        // Durable + queryable later (AI summarization) and counted by the spam
+        // velocity check below. Persisting before the spam check means the
+        // triggering message is included in its own velocity window. Idempotent
+        // on (groupId, messageId): a QStash retry must not create a duplicate
+        // row (a duplicate would also inflate the velocity count → false ban).
+        if (update.message.text && !update.message.text.startsWith('/')) {
           try {
-            await spamService.checkVelocityAndPunish(
-              internalGroupId, internalUserId,
-              BigInt(telegramGroupId), BigInt(telegramUserId)
-            );
+            await prisma.message.create({
+              data: {
+                groupId: internalGroupId,
+                userId: internalUserId,
+                messageId: BigInt(update.message.message_id),
+                messageText: update.message.text,
+              },
+            });
           } catch (err) {
-            logger.error({ err, requestId }, 'SpamService check failed');
+            // P2002 = already persisted by a prior delivery → treat as success.
+            // (Inert until the @@unique([groupId, messageId]) constraint is
+            // applied via `prisma db push`; until then no P2002 is raised.)
+            const code = (err as { code?: string } | null)?.code;
+            if (code !== 'P2002') {
+              logger.error({ err, requestId }, 'CRITICAL: Failed to persist message — failing update for retry');
+              throw err;
+            }
           }
         }
 
-        // ─── NON-CRITICAL: Log message event (fire-and-forget) ────
+        // ─── CRITICAL: Spam detection / moderation ───────────────────
+        // Propagates DB failures so the moderation audit trail is never
+        // silently lost; the worker retries on failure.
+        if (telegramGroupId && telegramUserId) {
+          await spamService.checkVelocityAndPunish(
+            internalGroupId, internalUserId,
+            BigInt(telegramGroupId), BigInt(telegramUserId)
+          );
+        }
+
+        // ─── NON-CRITICAL: analytics event (fire-and-forget) ─────────
         this.deferEventLog(internalGroupId, internalUserId, 'MESSAGE_SENT')
           .catch(err => logger.error({ err, requestId }, 'Non-critical: failed to log message event'));
-          
-        // ─── NON-CRITICAL: Persist message for AI Summarization ───
-        if (update.message.text && !update.message.text.startsWith('/')) {
-          prisma.message.create({
-            data: {
-              groupId: internalGroupId,
-              userId: internalUserId,
-              messageId: BigInt(update.message.message_id),
-              messageText: update.message.text,
-            }
-          }).catch(err => logger.error({ err, requestId }, 'Non-critical: failed to persist message text'));
-        }
       }
     }
   }

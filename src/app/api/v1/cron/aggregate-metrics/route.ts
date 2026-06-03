@@ -3,7 +3,9 @@ import { env } from '../../../../../config/env';
 import { prisma } from '../../../../../db/prisma';
 import { getQStashClient } from '../../../../../lib/qstash';
 
-export async function POST(req: NextRequest) {
+// Vercel Cron invokes endpoints with GET; we also accept POST for manual/QStash
+// triggers. Both share one handler.
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -33,8 +35,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, groupsEnqueued: groups.length });
-  } catch (error: any) {
+    // ── Hobby-plan cron orchestration ──────────────────────────────
+    // Vercel Hobby allows only 2 cron jobs (daily). This cron and
+    // generate-reports use both slots, so we chain the remaining
+    // maintenance jobs off this one via QStash (which forwards the
+    // Authorization header and gives us automatic retries):
+    //   • refresh-health  — daily
+    //   • prune-data       — weekly (Sundays, UTC)
+    // Each runs in its own worker invocation, so neither is constrained
+    // by this function's execution-time budget.
+    const cronAuth = { Authorization: `Bearer ${env.CRON_SECRET}` };
+    const followUps: Array<{ url: string; body: Record<string, never>; headers: Record<string, string> }> = [
+      { url: `${env.APP_URL}/api/v1/cron/refresh-health`, body: {}, headers: cronAuth },
+    ];
+    if (new Date().getUTCDay() === 0) {
+      followUps.push({ url: `${env.APP_URL}/api/v1/cron/prune-data`, body: {}, headers: cronAuth });
+    }
+    await Promise.all(followUps.map(f => qstash.publishJSON(f)));
+
+    return NextResponse.json({ success: true, groupsEnqueued: groups.length, chained: followUps.map(f => f.url) });
+  } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) || 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export const GET = handle;
+export const POST = handle;

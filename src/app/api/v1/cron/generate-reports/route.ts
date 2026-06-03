@@ -3,7 +3,8 @@ import { env } from '../../../../../config/env';
 import { prisma } from '../../../../../db/prisma';
 import { getQStashClient } from '../../../../../lib/qstash';
 
-export async function POST(req: NextRequest) {
+// Vercel Cron invokes endpoints with GET; we also accept POST. Shared handler.
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -37,7 +38,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, reportsEnqueued: tasks.length });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) || 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export const GET = handle;
+export const POST = handle;

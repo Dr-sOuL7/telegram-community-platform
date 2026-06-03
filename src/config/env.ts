@@ -1,5 +1,25 @@
 import { z } from "zod";
 
+/**
+ * Strict boolean parser for environment variables.
+ *
+ * IMPORTANT: We must NOT use `z.coerce.boolean()`. It applies JS `Boolean()`,
+ * for which `Boolean("false") === true` — so `FEATURE_AI=false` would ENABLE
+ * the feature (and the associated AI spend). This parser treats the var as a
+ * proper flag: only explicit truthy strings enable it; explicit falsy strings
+ * and unset both resolve to the provided default.
+ */
+const TRUTHY = new Set(["true", "1", "yes", "on"]);
+const FALSY = new Set(["false", "0", "no", "off", ""]);
+const boolEnv = (defaultValue: boolean) =>
+  z.preprocess((raw) => {
+    if (typeof raw !== "string") return defaultValue; // unset → default
+    const v = raw.trim().toLowerCase();
+    if (TRUTHY.has(v)) return true;
+    if (FALSY.has(v)) return false;
+    return defaultValue; // unrecognised → default rather than silently truthy
+  }, z.boolean());
+
 export const envSchema = z.object({
   // Telegram Configuration
   BOT_TOKEN: z.string().min(1, "BOT_TOKEN is required"),
@@ -22,21 +42,21 @@ export const envSchema = z.object({
   INITIAL_ADMIN_PASSWORD: z.string().min(1).optional(),
 
   // Feature Flags
-  FEATURE_ANALYTICS: z.coerce.boolean().default(false),
-  FEATURE_REPORTS: z.coerce.boolean().default(false),
-  FEATURE_HEALTH_SCORE: z.coerce.boolean().default(false),
-  FEATURE_REPUTATION: z.coerce.boolean().default(true),
+  FEATURE_ANALYTICS: boolEnv(false),
+  FEATURE_REPORTS: boolEnv(false),
+  FEATURE_HEALTH_SCORE: boolEnv(false),
+  FEATURE_REPUTATION: boolEnv(true),
 
   // AI Configuration
   GROQ_API_KEY: z.string().min(1).optional(),
-  
+
   // AI Feature Flags
-  FEATURE_AI: z.coerce.boolean().default(false),
-  FEATURE_SUMMARIZATION: z.coerce.boolean().default(false),
-  FEATURE_AI_INSIGHTS: z.coerce.boolean().default(false),
-  FEATURE_AI_REPORTS: z.coerce.boolean().default(false),
-  FEATURE_AI_RECOMMENDATIONS: z.coerce.boolean().default(false),
-  FEATURE_AI_ASSISTANT: z.coerce.boolean().default(false),
+  FEATURE_AI: boolEnv(false),
+  FEATURE_SUMMARIZATION: boolEnv(false),
+  FEATURE_AI_INSIGHTS: boolEnv(false),
+  FEATURE_AI_REPORTS: boolEnv(false),
+  FEATURE_AI_RECOMMENDATIONS: boolEnv(false),
+  FEATURE_AI_ASSISTANT: boolEnv(false),
 
   // Cron Security
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required to secure cron endpoints"),
