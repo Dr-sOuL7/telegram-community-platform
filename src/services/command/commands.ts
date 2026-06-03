@@ -189,7 +189,7 @@ registerCommand({
       const user = await prisma.user.findUnique({ where: { id: internalUserId } });
       if (!user) return;
       
-      await telegramClient.sendMessage(chatId, `👤 **${firstName}**, your current reputation score is **${user.reputation}**.`);
+      await telegramClient.sendMessage(chatId, `👤 ${firstName}, your current reputation score is ${user.reputation}.`);
     } catch (e) {
       logger.error({ err: e, internalUserId }, 'Failed to fetch reputation');
     }
@@ -214,10 +214,17 @@ registerCommand({
     const health = await healthScoreService.getLatestScore(internalGroupId);
     const score = health?.score || 'N/A';
     
+    const isPrivate = message.chat.type === 'private';
+    const webAppUrl = `${env.APP_URL}/public/groups/${internalGroupId}`;
+
     await telegramClient.sendMessage(message.chat.id, `❤️ Community Health Score: ${score}/100`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📊 View Public Analytics", web_app: { url: `${env.APP_URL}/public/groups/${internalGroupId}` } }]
+          [
+            isPrivate
+              ? { text: "📊 View Public Analytics", web_app: { url: webAppUrl } }
+              : { text: "📊 View Public Analytics", url: webAppUrl }
+          ]
         ]
       }
     });
@@ -255,10 +262,17 @@ Messages: ${stats.totalMessages}
 Commands: ${stats.totalCommands}
 Warnings: ${stats.warningsIssued}
 Bans: ${stats.bansIssued}`;
+    const isPrivate = message.chat.type === 'private';
+    const webAppUrl = `${env.APP_URL}/public/groups/${internalGroupId}`;
+
     await telegramClient.sendMessage(message.chat.id, text, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📊 View Public Analytics", web_app: { url: `${env.APP_URL}/public/groups/${internalGroupId}` } }]
+          [
+            isPrivate
+              ? { text: "📊 View Public Analytics", web_app: { url: webAppUrl } }
+              : { text: "📊 View Public Analytics", url: webAppUrl }
+          ]
         ]
       }
     });
@@ -329,7 +343,7 @@ registerCommand({
     
     try {
       const answer = await aiAssistantService.answerQuestion(internalGroupId, question);
-      await telegramClient.sendMessage(message.chat.id, `🤖 **AI Assistant:**\n\n${answer}`);
+      await telegramClient.sendMessage(message.chat.id, `🤖 AI Assistant:\n\n${answer}`);
     } catch (e: any) {
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to get answer: ${e.message}`);
     }
@@ -378,7 +392,7 @@ registerCommand({
     try {
       // Critical: Execute the Telegram API ban
       await telegramClient.banChatMember(message.chat.id, target.id);
-      await telegramClient.sendMessage(message.chat.id, `🔨 **${target.first_name}** has been banned.\nReason: ${reason}`);
+      await telegramClient.sendMessage(message.chat.id, `🔨 ${target.first_name} has been banned.\nReason: ${reason}`);
       
       // Critical: Log the moderation action to the database
       const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
@@ -549,16 +563,23 @@ registerCommand({
       
       if (!user) return;
 
-      const text = `👤 **Profile: ${user.firstName}**\n\n` +
-        `⭐ Reputation: **${user.reputation}**\n` +
-        `💬 Messages Sent${internalGroupId ? ' (This Group)' : ' (Global)'}: **${msgs}**\n` +
-        `⚠️ Warnings: **${user.warnings}**\n\n` +
+      const text = `👤 Profile: ${user.firstName}\n\n` +
+        `⭐ Reputation: ${user.reputation}\n` +
+        `💬 Messages Sent${internalGroupId ? ' (This Group)' : ' (Global)'}: ${msgs}\n` +
+        `⚠️ Warnings: ${user.warnings}\n\n` +
         `📅 Joined Network: ${user.joinedAt.toDateString()}`;
         
+      const isPrivate = message.chat.type === 'private';
+      const webAppUrl = `${env.APP_URL}/public/leaderboard`;
+
       await telegramClient.sendMessage(message.chat.id, text, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🏆 View Leaderboards", web_app: { url: `${env.APP_URL}/public/leaderboard` } }]
+            [
+              isPrivate
+                ? { text: "🏆 View Leaderboards", web_app: { url: webAppUrl } }
+                : { text: "🏆 View Leaderboards", url: webAppUrl }
+            ]
           ]
         }
       });
