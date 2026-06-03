@@ -7,6 +7,7 @@ import { getQStashClient } from '../qstash';
 import { env } from '../../config/env';
 import { telegramClient } from './TelegramClient';
 import { spamService } from '../../services/spam/SpamService';
+import { prisma } from '../../db/prisma';
 
 export class UpdateDispatcher {
   async dispatch(update: TelegramUpdate, requestId: string): Promise<void> {
@@ -134,6 +135,17 @@ export class UpdateDispatcher {
         // ─── NON-CRITICAL: Log message event (fire-and-forget) ────
         this.deferEventLog(internalGroupId, internalUserId, 'MESSAGE_SENT')
           .catch(err => logger.error({ err, requestId }, 'Non-critical: failed to log message event'));
+          
+        // ─── NON-CRITICAL: Persist message for AI Summarization ───
+        if (update.message.text && !update.message.text.startsWith('/')) {
+          prisma.message.create({
+            data: {
+              groupId: internalGroupId,
+              userId: internalUserId,
+              messageText: update.message.text,
+            }
+          }).catch(err => logger.error({ err, requestId }, 'Non-critical: failed to persist message text'));
+        }
       }
     }
   }
