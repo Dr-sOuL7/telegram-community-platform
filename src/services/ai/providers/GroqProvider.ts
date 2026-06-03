@@ -23,7 +23,7 @@ export class GroqProvider implements IAIProvider {
     
     // Default to a fast Groq model if none provided
     const response = await this.client.chat.completions.create({
-      model: request.model || "llama3-8b-8192",
+      model: request.model || "llama-3.1-8b-instant",
       messages: request.messages,
       max_tokens: request.maxTokens || 2048,
       temperature: request.temperature ?? 0.7,
