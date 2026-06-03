@@ -142,6 +142,7 @@ export class UpdateDispatcher {
             data: {
               groupId: internalGroupId,
               userId: internalUserId,
+              messageId: BigInt(update.message.message_id),
               messageText: update.message.text,
             }
           }).catch(err => logger.error({ err, requestId }, 'Non-critical: failed to persist message text'));
