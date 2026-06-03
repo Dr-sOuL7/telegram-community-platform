@@ -28,9 +28,19 @@ export interface TelegramMessage {
   left_chat_member?: TelegramUser;
 }
 
+export interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  inline_message_id?: string;
+  chat_instance: string;
+  data?: string;
+  game_short_name?: string;
+}
+
 export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
   edited_message?: TelegramMessage;
-  // callback_query, chat_member omitted for brevity in Phase 1 setup
+  callback_query?: TelegramCallbackQuery;
 }

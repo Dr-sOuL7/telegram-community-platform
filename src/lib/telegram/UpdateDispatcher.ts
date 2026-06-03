@@ -8,9 +8,15 @@ import { env } from '../../config/env';
 import { telegramClient } from './TelegramClient';
 import { spamService } from '../../services/spam/SpamService';
 import { prisma } from '../../db/prisma';
+import { handleSettingsCallback, handleSettingsForceReply } from '../../services/command/settingsHandler';
 
 export class UpdateDispatcher {
   async dispatch(update: TelegramUpdate, requestId: string): Promise<void> {
+    if (update.callback_query) {
+      await handleSettingsCallback(update.callback_query);
+      return;
+    }
+
     let internalGroupId: string | undefined = undefined;
     let internalUserId: string | undefined = undefined;
 
@@ -89,6 +95,12 @@ export class UpdateDispatcher {
     }
 
     // ─── CRITICAL PATH: Command Execution ────────────────────────
+    
+    // First, check if this is a stateless force reply for settings
+    if (update.message?.chat?.type === 'private') {
+      const handled = await handleSettingsForceReply(update.message);
+      if (handled) return;
+    }
 
     if (update.message && update.message.text && update.message.text.startsWith('/')) {
       const parts = update.message.text.split(/\s+/);

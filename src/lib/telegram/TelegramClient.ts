@@ -79,6 +79,22 @@ export class TelegramClient {
   async setMyCommands(commands: { command: string; description: string }[]) {
     return this.request('setMyCommands', { commands });
   }
+
+  async answerCallbackQuery(callbackQueryId: string, options?: { text?: string; show_alert?: boolean; url?: string; cache_time?: number }) {
+    return this.request('answerCallbackQuery', {
+      callback_query_id: callbackQueryId,
+      ...options,
+    });
+  }
+
+  async editMessageText(chatId: bigint | number | string, messageId: number, text: string, options?: any) {
+    return this.request('editMessageText', {
+      chat_id: chatId.toString(),
+      message_id: messageId,
+      text,
+      ...options,
+    });
+  }
 }
 
 export const telegramClient = new TelegramClient();

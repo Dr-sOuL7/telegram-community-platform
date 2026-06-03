@@ -27,6 +27,14 @@ registerCommand({
     const { message } = ctx;
     if (!message.chat) return;
 
+    const args = (message.text || '').split(/\s+/).slice(1);
+    if (args.length > 0 && args[0].startsWith('settings_')) {
+      const targetGroupId = args[0].replace('settings_', '');
+      const { handleSettingsDeepLink } = require('./settingsHandler');
+      await handleSettingsDeepLink(ctx, targetGroupId);
+      return;
+    }
+
     const name = message.from?.first_name || 'there';
     const text = [
       `👋 Hey ${name}! Welcome to the Community Intelligence Bot.`,
@@ -187,7 +195,15 @@ registerCommand({
 • Welcome Message: ${settings.welcomeEnabled ? '✅ ON' : '❌ OFF'}
 • Farewell Message: ${settings.farewellEnabled ? '✅ ON' : '❌ OFF'}`;
 
-      await telegramClient.sendMessage(message.chat.id, text, { parse_mode: 'Markdown' });
+      const botUsername = 'CommunityManager1Bot';
+      await telegramClient.sendMessage(message.chat.id, text, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "⚙️ Open Settings in DM", url: `https://t.me/${botUsername}?start=settings_${internalGroupId}` }]
+          ]
+        }
+      });
     } catch (e: any) {
       logger.error({ err: e, internalGroupId }, 'Failed to fetch settings');
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to fetch settings: ${e.message}`);
