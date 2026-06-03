@@ -411,6 +411,53 @@ registerCommand({
 });
 
 registerCommand({
+  name: 'unban',
+  description: 'Unban a user so they can rejoin the group (Reply to their message)',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/unban [reason]',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat || !internalUserId || !message.from) return;
+
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "❌ This command can only be used in a group.");
+      return;
+    }
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
+
+    const target = getTargetUser(message);
+    if (!target) {
+      await telegramClient.sendMessage(message.chat.id, "Please reply to a message from the user you want to unban.");
+      return;
+    }
+
+    const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
+
+    try {
+      await telegramClient.unbanChatMember(message.chat.id, target.id, true);
+      await telegramClient.sendMessage(message.chat.id, `✅ ${target.first_name} has been unbanned and can rejoin the group.\nReason: ${reason}`);
+      
+      const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
+      await moderationRepo.createAction({
+        userId: targetUser.id,
+        groupId: internalGroupId,
+        moderatorId: internalUserId,
+        actionType: 'UNBAN',
+        reason
+      });
+    } catch (e: any) {
+      logger.error({ err: e, internalGroupId }, 'Failed to unban user');
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to unban: ${e.message}`);
+    }
+  }
+});
+
+registerCommand({
   name: 'mute',
   description: 'Mute a user (Reply to their message)',
   category: 'Moderation',
@@ -454,6 +501,71 @@ registerCommand({
     } catch (e: any) {
       logger.error({ err: e, internalGroupId }, 'Failed to mute user');
       await telegramClient.sendMessage(message.chat.id, `❌ Failed to mute: ${e.message}`);
+    }
+  }
+});
+
+registerCommand({
+  name: 'unmute',
+  description: 'Unmute a user so they can chat again (Reply to their message)',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/unmute [reason]',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat || !internalUserId || !message.from) return;
+
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "❌ This command can only be used in a group.");
+      return;
+    }
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
+
+    const target = getTargetUser(message);
+    if (!target) {
+      await telegramClient.sendMessage(message.chat.id, "Please reply to a message from the user you want to unmute.");
+      return;
+    }
+
+    const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
+
+    // Restore all default permissions
+    const permissions = {
+      can_send_messages: true,
+      can_send_audios: true,
+      can_send_documents: true,
+      can_send_photos: true,
+      can_send_videos: true,
+      can_send_video_notes: true,
+      can_send_voice_notes: true,
+      can_send_polls: true,
+      can_send_other_messages: true,
+      can_add_web_page_previews: true,
+      can_change_info: true,
+      can_invite_users: true,
+      can_pin_messages: true,
+      can_manage_topics: true,
+    };
+
+    try {
+      await telegramClient.restrictChatMember(message.chat.id, target.id, permissions);
+      await telegramClient.sendMessage(message.chat.id, `🔊 ${target.first_name} has been unmuted and can chat again.\nReason: ${reason}`);
+      
+      const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
+      await moderationRepo.createAction({
+        userId: targetUser.id,
+        groupId: internalGroupId,
+        moderatorId: internalUserId,
+        actionType: 'UNMUTE',
+        reason
+      });
+    } catch (e: any) {
+      logger.error({ err: e, internalGroupId }, 'Failed to unmute user');
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to unmute: ${e.message}`);
     }
   }
 });
