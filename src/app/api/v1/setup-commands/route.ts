@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       { command: 'start', description: '👋 Welcome message and bot introduction' },
       { command: 'help', description: '📖 List all available commands' },
       { command: 'ping', description: '🏓 Check if the bot is online' },
-      { command: 'debug', description: '🛠 Debug internal context' },
+      { command: 'settings', description: '⚙️ View current group bot settings (admin)' },
       { command: 'reputation', description: '⭐ View your reputation score' },
       { command: 'profile', description: '👤 View your community profile' },
       { command: 'health', description: '❤️ View community health score' },

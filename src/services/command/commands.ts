@@ -140,33 +140,58 @@ registerCommand({
 });
 
 registerCommand({
-  name: 'debug',
-  description: 'Debug internal context',
+  name: 'settings',
+  description: 'View current group bot settings',
   category: 'Utility',
-  adminOnly: false,
-  usage: '/debug',
+  adminOnly: true,
+  usage: '/settings',
   execute: async (ctx) => {
-    const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat) return;
+    const { message, internalGroupId } = ctx;
+    if (!message.chat || !message.from) return;
 
-    let groupError = 'None';
-    try {
-      await groupRepo.upsert(
-        BigInt(message.chat.id),
-        message.chat.title || 'Unknown Group'
-      );
-    } catch (err: any) {
-      groupError = err.message || err.toString();
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "❌ This command can only be used in a group.");
+      return;
     }
 
-    const text = `🛠 Debug Info
-chat.id: ${message.chat.id}
-chat.type: ${message.chat.type}
-internalGroupId: ${internalGroupId || 'UNDEFINED'}
-internalUserId: ${internalUserId || 'UNDEFINED'}
-upsertError: ${groupError}`;
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
 
-    await telegramClient.sendMessage(message.chat.id, text);
+    try {
+      const settings = await prisma.groupSettings.findUnique({
+        where: { groupId: internalGroupId }
+      });
+
+      if (!settings) {
+        await telegramClient.sendMessage(message.chat.id, "⚙️ Group settings not found. Default settings are in use.");
+        return;
+      }
+
+      const text = `⚙️ *Group Settings*
+
+🛡️ *Moderation & Spam*
+• Anti-Spam: ${settings.antiSpamEnabled ? '✅ ON' : '❌ OFF'}
+• Spam Threshold: ${settings.spamThresholdMsg} msgs / ${settings.spamThresholdTime}s
+• Spam Action: ${settings.spamAction}
+• Warn Limit: ${settings.warnThreshold}
+• Mute Limit: ${settings.muteThreshold}
+
+⭐ *Features*
+• Reputation System: ${settings.reputationEnabled ? '✅ ON' : '❌ OFF'}
+• Health Score: ${settings.healthScoreEnabled ? '✅ ON' : '❌ OFF'}
+• Automated Reports: ${settings.reportsEnabled ? '✅ ON' : '❌ OFF'} (${settings.reportFrequency})
+
+👋 *Greetings*
+• Welcome Message: ${settings.welcomeEnabled ? '✅ ON' : '❌ OFF'}
+• Farewell Message: ${settings.farewellEnabled ? '✅ ON' : '❌ OFF'}`;
+
+      await telegramClient.sendMessage(message.chat.id, text, { parse_mode: 'Markdown' });
+    } catch (e: any) {
+      logger.error({ err: e, internalGroupId }, 'Failed to fetch settings');
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to fetch settings: ${e.message}`);
+    }
   }
 });
 
