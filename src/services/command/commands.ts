@@ -1,5 +1,5 @@
 import { registerCommand, commandRegistry } from './registry';
-import { reputationService, healthScoreService, reportService, analyticsRepo, userRepo, moderationRepo } from '../container';
+import { reputationService, healthScoreService, reportService, analyticsRepo, userRepo, moderationRepo, groupRepo } from '../container';
 import { telegramClient } from '../../lib/telegram/TelegramClient';
 import { summarizationService, aiAssistantService } from '../container';
 import { env } from '../../config/env';
@@ -151,7 +151,6 @@ registerCommand({
 
     let groupError = 'None';
     try {
-      const { groupRepo } = require('../../services/container');
       await groupRepo.upsert(
         BigInt(message.chat.id),
         message.chat.title || 'Unknown Group'
