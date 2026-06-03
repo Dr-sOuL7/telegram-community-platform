@@ -5,6 +5,7 @@ import { summarizationService, aiAssistantService } from '../container';
 import { env } from '../../config/env';
 import { prisma } from '../../db/prisma';
 import { logger } from '../../lib/logger/pino';
+import { handleSettingsDeepLink } from './settingsHandler';
 
 async function isUserAdmin(chatId: bigint | number, userId: bigint | number): Promise<boolean> {
   try {
@@ -30,7 +31,6 @@ registerCommand({
     const args = (message.text || '').split(/\s+/).slice(1);
     if (args.length > 0 && args[0].startsWith('settings_')) {
       const targetGroupId = args[0].replace('settings_', '');
-      const { handleSettingsDeepLink } = require('./settingsHandler');
       await handleSettingsDeepLink(ctx, targetGroupId);
       return;
     }
