@@ -623,6 +623,62 @@ registerCommand({
 });
 
 registerCommand({
+  name: 'unwarn',
+  description: 'Remove a warning from a user (Reply to their message)',
+  category: 'Moderation',
+  adminOnly: true,
+  usage: '/unwarn [reason]',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat || !internalUserId || !message.from) return;
+
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "❌ This command can only be used in a group.");
+      return;
+    }
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
+      return;
+    }
+
+    const target = getTargetUser(message);
+    if (!target) {
+      await telegramClient.sendMessage(message.chat.id, "Please reply to a message from the user you want to unwarn.");
+      return;
+    }
+
+    const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
+
+    try {
+      const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
+      
+      // Only decrement if warnings > 0
+      const currentUser = await prisma.user.findUnique({ where: { id: targetUser.id } });
+      if (currentUser && currentUser.warnings > 0) {
+        await prisma.user.update({
+          where: { id: targetUser.id },
+          data: { warnings: { decrement: 1 } }
+        });
+      }
+
+      await moderationRepo.createAction({
+        userId: targetUser.id,
+        groupId: internalGroupId,
+        moderatorId: internalUserId,
+        actionType: 'UNWARN',
+        reason
+      });
+
+      await telegramClient.sendMessage(message.chat.id, `✅ A warning has been removed from ${target.first_name}.\nReason: ${reason}`);
+    } catch (e: any) {
+      logger.error({ err: e, internalGroupId }, 'Failed to unwarn user');
+      await telegramClient.sendMessage(message.chat.id, `❌ Failed to unwarn: ${e.message}`);
+    }
+  }
+});
+
+registerCommand({
   name: 'delete',
   description: 'Delete a message (Reply to it)',
   category: 'Moderation',

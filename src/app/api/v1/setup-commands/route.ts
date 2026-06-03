@@ -15,11 +15,20 @@ export async function POST(req: NextRequest) {
       { command: 'start', description: '👋 Welcome message and bot introduction' },
       { command: 'help', description: '📖 List all available commands' },
       { command: 'ping', description: '🏓 Check if the bot is online' },
+      { command: 'debug', description: '🛠 Debug internal context' },
       { command: 'reputation', description: '⭐ View your reputation score' },
+      { command: 'profile', description: '👤 View your community profile' },
       { command: 'health', description: '❤️ View community health score' },
       { command: 'groupstats', description: '📊 View group statistics (admin)' },
       { command: 'summary', description: '🤖 AI summary of last 24h (admin)' },
       { command: 'ask', description: '💬 Ask the AI about your community (admin)' },
+      { command: 'ban', description: '🔨 Ban a user (admin, reply to message)' },
+      { command: 'unban', description: '✅ Unban a user (admin, reply to message)' },
+      { command: 'mute', description: '🔇 Mute a user for 1 hour (admin, reply to message)' },
+      { command: 'unmute', description: '🔊 Unmute a user (admin, reply to message)' },
+      { command: 'warn', description: '⚠️ Warn a user (admin, reply to message)' },
+      { command: 'unwarn', description: '✅ Remove a warning (admin, reply to message)' },
+      { command: 'delete', description: '🗑 Delete a message (admin, reply to message)' },
     ];
 
     await telegramClient.setMyCommands(commands);
