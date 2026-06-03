@@ -6,6 +6,15 @@ import { env } from '../../config/env';
 import { prisma } from '../../db/prisma';
 import { logger } from '../../lib/logger/pino';
 
+async function isUserAdmin(chatId: bigint | number, userId: bigint | number): Promise<boolean> {
+  try {
+    const member = await telegramClient.getChatMember(chatId, userId);
+    return member.status === 'creator' || member.status === 'administrator';
+  } catch {
+    return false;
+  }
+}
+
 // ─── Core Commands ───────────────────────────────────────────────
 
 registerCommand({
@@ -173,10 +182,15 @@ registerCommand({
   usage: '/groupstats',
   execute: async (ctx) => {
     const { message, internalGroupId } = ctx;
-    if (!message.chat) return;
+    if (!message.chat || !message.from) return;
     
     if (!internalGroupId) {
       await telegramClient.sendMessage(message.chat.id, "This command can only be used in a group.");
+      return;
+    }
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
       return;
     }
     
@@ -205,10 +219,15 @@ registerCommand({
   usage: '/summary',
   execute: async (ctx) => {
     const { message, internalGroupId } = ctx;
-    if (!message.chat) return;
+    if (!message.chat || !message.from) return;
     
     if (!internalGroupId) {
       await telegramClient.sendMessage(message.chat.id, "This command can only be used in a group.");
+      return;
+    }
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
       return;
     }
     
@@ -233,10 +252,15 @@ registerCommand({
   usage: '/ask <question>',
   execute: async (ctx) => {
     const { message, internalGroupId } = ctx;
-    if (!message.chat || !message.text) return;
+    if (!message.chat || !message.text || !message.from) return;
     
     if (!internalGroupId) {
       await telegramClient.sendMessage(message.chat.id, "This command can only be used in a group.");
+      return;
+    }
+
+    if (!(await isUserAdmin(message.chat.id, message.from.id))) {
+      await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
       return;
     }
     
@@ -260,14 +284,7 @@ registerCommand({
 
 // ─── Moderation Commands ─────────────────────────────────────────
 
-async function isUserAdmin(chatId: bigint | number, userId: bigint | number): Promise<boolean> {
-  try {
-    const member = await telegramClient.getChatMember(chatId, userId);
-    return member.status === 'creator' || member.status === 'administrator';
-  } catch {
-    return false;
-  }
-}
+
 
 function getTargetUser(message: any) {
   if (message.reply_to_message?.from) {
@@ -284,7 +301,12 @@ registerCommand({
   usage: '/ban [reason]',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat || !internalGroupId || !internalUserId || !message.from) return;
+    if (!message.chat || !internalUserId || !message.from) return;
+
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "❌ This command can only be used in a group.");
+      return;
+    }
 
     if (!(await isUserAdmin(message.chat.id, message.from.id))) {
       await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
@@ -328,7 +350,12 @@ registerCommand({
   usage: '/mute [reason]',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat || !internalGroupId || !internalUserId || !message.from) return;
+    if (!message.chat || !internalUserId || !message.from) return;
+
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "❌ This command can only be used in a group.");
+      return;
+    }
 
     if (!(await isUserAdmin(message.chat.id, message.from.id))) {
       await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
@@ -371,7 +398,12 @@ registerCommand({
   usage: '/warn [reason]',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat || !internalGroupId || !internalUserId || !message.from) return;
+    if (!message.chat || !internalUserId || !message.from) return;
+
+    if (!internalGroupId) {
+      await telegramClient.sendMessage(message.chat.id, "❌ This command can only be used in a group.");
+      return;
+    }
 
     if (!(await isUserAdmin(message.chat.id, message.from.id))) {
       await telegramClient.sendMessage(message.chat.id, "❌ Only Telegram Group Admins can use this command.");
@@ -450,17 +482,22 @@ registerCommand({
   usage: '/profile',
   execute: async (ctx) => {
     const { message, internalGroupId, internalUserId } = ctx;
-    if (!message.chat || !internalGroupId || !internalUserId) return;
+    if (!message.chat || !internalUserId) return;
 
     try {
       const user = await prisma.user.findUnique({ where: { id: internalUserId } });
-      const msgs = await prisma.message.count({ where: { userId: internalUserId, groupId: internalGroupId } });
+      let msgs = 0;
+      if (internalGroupId) {
+        msgs = await prisma.message.count({ where: { userId: internalUserId, groupId: internalGroupId } });
+      } else {
+        msgs = await prisma.message.count({ where: { userId: internalUserId } });
+      }
       
       if (!user) return;
 
       const text = `👤 **Profile: ${user.firstName}**\n\n` +
         `⭐ Reputation: **${user.reputation}**\n` +
-        `💬 Messages Sent: **${msgs}**\n` +
+        `💬 Messages Sent${internalGroupId ? ' (This Group)' : ' (Global)'}: **${msgs}**\n` +
         `⚠️ Warnings: **${user.warnings}**\n\n` +
         `📅 Joined Network: ${user.joinedAt.toDateString()}`;
         

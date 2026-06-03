@@ -85,8 +85,8 @@ export class UpdateDispatcher {
     // ─── CRITICAL PATH: Command Execution ────────────────────────
 
     if (update.message && update.message.text && update.message.text.startsWith('/')) {
-      const parts = update.message.text.split(' ');
-      const commandName = parts[0].substring(1).split('@')[0];
+      const parts = update.message.text.split(/\s+/);
+      const commandName = parts[0].substring(1).split('@')[0].toLowerCase();
       
       const command = commandRegistry.get(commandName);
       if (command) {
