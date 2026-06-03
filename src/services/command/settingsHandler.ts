@@ -13,13 +13,35 @@ async function isUserAdmin(chatId: string | bigint | number, userId: string | bi
   }
 }
 
+function parseSmartTime(input: string): number | null {
+  let totalSeconds = 0;
+  let matched = false;
+  
+  const hoursMatch = input.match(/(\d+)\s*h/i);
+  if (hoursMatch) { totalSeconds += parseInt(hoursMatch[1]) * 3600; matched = true; }
+  
+  const minsMatch = input.match(/(\d+)\s*m/i);
+  if (minsMatch) { totalSeconds += parseInt(minsMatch[1]) * 60; matched = true; }
+  
+  const secsMatch = input.match(/(\d+)\s*s/i);
+  if (secsMatch) { totalSeconds += parseInt(secsMatch[1]); matched = true; }
+  
+  if (!matched) {
+    const num = parseInt(input);
+    if (!isNaN(num)) return num;
+    return null;
+  }
+  
+  return totalSeconds;
+}
+
 function buildSettingsMenu(settings: any, groupId: string) {
   const keyboard = [
     [
       { text: `Anti-Spam: ${settings.antiSpamEnabled ? '✅ ON' : '❌ OFF'}`, callback_data: `set_toggleSpam_${groupId}` }
     ],
     [
-      { text: `Edit Spam Threshold (${settings.spamThresholdMsg}m/${settings.spamThresholdTime}s)`, callback_data: `set_spamThresh_${groupId}` },
+      { text: `Edit Spam Threshold (${settings.spamThresholdMsg}m/${settings.spamThresholdTime}s)`, callback_data: `set_spamThreshMenu_${groupId}` },
       { text: `Spam Action: ${settings.spamAction}`, callback_data: `set_spamAct_${groupId}` }
     ],
     [
@@ -94,7 +116,27 @@ export async function handleSettingsCallback(query: TelegramCallbackQuery) {
 
     let updated = false;
 
-    if (action === 'toggleSpam') {
+    if (action === 'mainMenu') {
+      if (query.message) {
+        const markup = buildSettingsMenu(settings, groupId);
+        await telegramClient.editMessageText(query.from.id, query.message.message_id, `⚙️ **Settings for ${group.groupName}**\n\nUse the buttons below to toggle features. To edit values, follow the bot's prompt.`, { parse_mode: 'Markdown', reply_markup: markup });
+      }
+      await telegramClient.answerCallbackQuery(query.id);
+      return;
+    } else if (action === 'spamThreshMenu') {
+      const markup = {
+        inline_keyboard: [
+          [{ text: "📝 Number of Messages", callback_data: `set_spamMsg_${groupId}` }],
+          [{ text: "⏱️ Time Window", callback_data: `set_spamTime_${groupId}` }],
+          [{ text: "« Back to Settings", callback_data: `set_mainMenu_${groupId}` }]
+        ]
+      };
+      if (query.message) {
+        await telegramClient.editMessageText(query.from.id, query.message.message_id, `⚙️ **Spam Threshold Settings**\n\nCurrent: ${settings.spamThresholdMsg} messages / ${settings.spamThresholdTime} seconds`, { parse_mode: 'Markdown', reply_markup: markup });
+      }
+      await telegramClient.answerCallbackQuery(query.id);
+      return;
+    } else if (action === 'toggleSpam') {
       settings = await prisma.groupSettings.update({ where: { groupId }, data: { antiSpamEnabled: !settings.antiSpamEnabled } });
       updated = true;
     } else if (action === 'toggleWelc') {
@@ -107,14 +149,22 @@ export async function handleSettingsCallback(query: TelegramCallbackQuery) {
       const nextAction = settings.spamAction === 'WARN' ? 'MUTE' : (settings.spamAction === 'MUTE' ? 'BAN' : 'WARN');
       settings = await prisma.groupSettings.update({ where: { groupId }, data: { spamAction: nextAction } });
       updated = true;
-    } else if (action === 'spamThresh' || action === 'warnLimit' || action === 'muteLimit' || action === 'editWelc' || action === 'editFare') {
-      // Force Reply Pattern
+    } else if (['spamMsg', 'spamTime', 'warnLimit', 'muteLimit', 'editWelc', 'editFare'].includes(action)) {
+      
+      // Store session in database
+      await prisma.adminSession.upsert({
+        where: { userId: query.from.id.toString() },
+        update: { groupId, action },
+        create: { userId: query.from.id.toString(), groupId, action }
+      });
+
       let prompt = '';
-      if (action === 'spamThresh') prompt = `Please reply to this message with the new spam threshold format: "messages/seconds" (e.g. "5/10")\n\n[ID:${groupId}|spamThresh]`;
-      if (action === 'warnLimit') prompt = `Please reply to this message with the new Warn Limit (number).\n\n[ID:${groupId}|warnLimit]`;
-      if (action === 'muteLimit') prompt = `Please reply to this message with the new Mute Limit (number).\n\n[ID:${groupId}|muteLimit]`;
-      if (action === 'editWelc') prompt = `Please reply to this message with the new Welcome Message. Use {name} for the user's name.\n\n[ID:${groupId}|editWelc]`;
-      if (action === 'editFare') prompt = `Please reply to this message with the new Farewell Message. Use {name} for the user's name.\n\n[ID:${groupId}|editFare]`;
+      if (action === 'spamMsg') prompt = `Please reply to this message with the Number of Messages for the spam threshold (e.g. 5).`;
+      if (action === 'spamTime') prompt = `Please reply to this message with the Time Window for the spam threshold.\n\nSmart formats accepted: 1h 30m 10s, 5m, or simply 10 (for seconds).`;
+      if (action === 'warnLimit') prompt = `Please reply to this message with the new Warn Limit (number).`;
+      if (action === 'muteLimit') prompt = `Please reply to this message with the new Mute Limit (number).`;
+      if (action === 'editWelc') prompt = `Please reply to this message with the new Welcome Message.\n\nUse {name} to insert the user's name.`;
+      if (action === 'editFare') prompt = `Please reply to this message with the new Farewell Message.\n\nUse {name} to insert the user's name.`;
 
       await telegramClient.sendMessage(query.from.id, prompt, { reply_markup: { force_reply: true } });
       await telegramClient.answerCallbackQuery(query.id);
@@ -135,35 +185,43 @@ export async function handleSettingsCallback(query: TelegramCallbackQuery) {
 }
 
 export async function handleSettingsForceReply(message: TelegramMessage) {
-  if (!message.reply_to_message || !message.reply_to_message.text) return false;
-  if (!message.text) return false;
+  if (!message.reply_to_message || !message.text || !message.from) return false;
 
-  const replyText = message.reply_to_message.text;
-  const match = replyText.match(/\[ID:(.+)\|(.+)\]/);
-  if (!match) return false;
-
-  const groupId = match[1];
-  const action = match[2];
-  const value = message.text.trim();
+  const userId = message.from.id.toString();
 
   try {
+    const session = await prisma.adminSession.findUnique({ where: { userId } });
+    if (!session) return false; // Not editing anything or not a valid reply
+
+    // We found a session, so we handle it
+    const { groupId, action } = session;
+    const value = message.text.trim();
+
+    // Clean up session immediately to prevent stuck states
+    await prisma.adminSession.delete({ where: { userId } });
+
     const group = await prisma.group.findUnique({ where: { id: groupId } });
-    if (!group || !message.from) return false;
+    if (!group) return true; // Handled, but group is gone
 
     const isAdmin = await isUserAdmin(group.telegramGroupId, message.from.id);
-    if (!isAdmin) return false;
+    if (!isAdmin) return true; // Handled, but no longer admin
 
     const updateData: any = {};
 
-    if (action === 'spamThresh') {
-      const parts = value.split('/');
-      if (parts.length === 2 && !isNaN(parseInt(parts[0])) && !isNaN(parseInt(parts[1]))) {
-        updateData.spamThresholdMsg = parseInt(parts[0]);
-        updateData.spamThresholdTime = parseInt(parts[1]);
-      } else {
-        await telegramClient.sendMessage(message.chat.id, "❌ Invalid format. Please use messages/seconds (e.g. 5/10).");
+    if (action === 'spamMsg') {
+      const num = parseInt(value);
+      if (isNaN(num) || num < 1) {
+        await telegramClient.sendMessage(message.chat.id, "❌ Invalid number of messages.");
         return true;
       }
+      updateData.spamThresholdMsg = num;
+    } else if (action === 'spamTime') {
+      const seconds = parseSmartTime(value);
+      if (seconds === null || seconds < 1) {
+        await telegramClient.sendMessage(message.chat.id, "❌ Invalid time format. Please use something like '5m' or '1h 30m'.");
+        return true;
+      }
+      updateData.spamThresholdTime = seconds;
     } else if (action === 'warnLimit') {
       const num = parseInt(value);
       if (isNaN(num) || num < 1) {
@@ -185,14 +243,16 @@ export async function handleSettingsForceReply(message: TelegramMessage) {
     }
 
     if (Object.keys(updateData).length > 0) {
-      const settings = await prisma.groupSettings.update({ where: { groupId }, data: updateData });
+      let settings = await prisma.groupSettings.update({ where: { groupId }, data: updateData });
+      
+      // If it was a spam sub-menu setting, we return them to the sub-menu or main menu. Let's just return to main menu for simplicity.
       const markup = buildSettingsMenu(settings, groupId);
       await telegramClient.sendMessage(message.chat.id, `✅ **Setting updated for ${group.groupName}**`, { parse_mode: 'Markdown', reply_markup: markup });
     }
 
-    return true; // Indicates we handled a force reply
+    return true; // We handled a force reply
   } catch (err: any) {
-    logger.error({ err, groupId }, 'Failed to process force reply');
+    logger.error({ err, userId }, 'Failed to process force reply');
     return false;
   }
 }
