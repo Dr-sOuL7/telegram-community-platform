@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '../../../../config/env';
 import { telegramClient } from '../../../../lib/telegram/TelegramClient';
+import { prisma } from '../../../../db/prisma';
 
 // One-time setup endpoint to register the bot's command menu with Telegram.
 // Call this once: POST /api/v1/setup-commands with Authorization: Bearer <CRON_SECRET>
@@ -11,6 +12,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AdminSession" (
+          "userId" TEXT NOT NULL,
+          "groupId" TEXT NOT NULL,
+          "action" TEXT NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          CONSTRAINT "AdminSession_pkey" PRIMARY KEY ("userId")
+      );
+    `);
+
     const commands = [
       { command: 'start', description: '👋 Welcome message and bot introduction' },
       { command: 'help', description: '📖 List all available commands' },
