@@ -45,11 +45,23 @@ registerCommand({
 
     const botUsername = 'CommunityManager1Bot';
 
+    const isPrivate = message.chat.type === 'private';
+    const webAppUrl = `${env.APP_URL}`;
+    const leaderboardUrl = `${env.APP_URL}/public/leaderboard`;
+
     await telegramClient.sendMessage(message.chat.id, text, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🌐 Visit Website", web_app: { url: `${env.APP_URL}` } }],
-          [{ text: "🏆 Global Leaderboards", web_app: { url: `${env.APP_URL}/public/leaderboard` } }],
+          [
+            isPrivate 
+              ? { text: "🌐 Visit Website", web_app: { url: webAppUrl } }
+              : { text: "🌐 Visit Website", url: webAppUrl }
+          ],
+          [
+            isPrivate
+              ? { text: "🏆 Global Leaderboards", web_app: { url: leaderboardUrl } }
+              : { text: "🏆 Global Leaderboards", url: leaderboardUrl }
+          ],
           [{ text: "➕ Add Bot to your Group", url: `https://t.me/${botUsername}?startgroup=true` }]
         ]
       }
@@ -91,10 +103,17 @@ registerCommand({
       `Tip: Use /ask <question> to chat with the AI about your community.`,
     ].join('\n');
 
+    const isPrivate = message.chat.type === 'private';
+    const commandsUrl = `${env.APP_URL}/dashboard/commands`;
+
     await telegramClient.sendMessage(message.chat.id, text, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🌐 Full Command List Online", web_app: { url: `${env.APP_URL}/dashboard/commands` } }]
+          [
+            isPrivate
+              ? { text: "🌐 Full Command List Online", web_app: { url: commandsUrl } }
+              : { text: "🌐 Full Command List Online", url: commandsUrl }
+          ]
         ]
       }
     });
@@ -117,6 +136,27 @@ registerCommand({
     const seconds = Math.floor(uptime % 60);
 
     await telegramClient.sendMessage(message.chat.id, `🏓 Pong! Bot is online.\n⏱️ Uptime: ${hours}h ${minutes}m ${seconds}s`);
+  }
+});
+
+registerCommand({
+  name: 'debug',
+  description: 'Debug internal context',
+  category: 'Utility',
+  adminOnly: false,
+  usage: '/debug',
+  execute: async (ctx) => {
+    const { message, internalGroupId, internalUserId } = ctx;
+    if (!message.chat) return;
+
+    const text = `🛠️ **Debug Info**
+chat.id: ${message.chat.id}
+chat.type: ${message.chat.type}
+isGroup (expected): ${message.chat.type === 'group' || message.chat.type === 'supergroup'}
+internalGroupId: ${internalGroupId || 'UNDEFINED'}
+internalUserId: ${internalUserId || 'UNDEFINED'}`;
+
+    await telegramClient.sendMessage(message.chat.id, text);
   }
 });
 
