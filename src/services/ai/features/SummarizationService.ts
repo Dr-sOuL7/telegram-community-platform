@@ -39,7 +39,10 @@ export class SummarizationService {
         tokensUsed: response.totalTokens,
       });
 
-      return `**Summary:** ${parsed.summary}\n\n**Topics:** ${(parsed.topics || []).join(", ")}`;
+      const finalSummary = parsed.summary || "No messages to summarize in this time range.";
+      const finalTopics = (parsed.topics && parsed.topics.length > 0) ? parsed.topics.join(", ") : "None";
+
+      return `Summary: ${finalSummary}\n\nTopics: ${finalTopics}`;
     } catch (error) {
       // Fallback if AI didn't output valid JSON
       return `Failed to parse AI summary. Raw output:\n${response.content}`;
