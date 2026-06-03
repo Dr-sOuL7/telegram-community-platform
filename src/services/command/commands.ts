@@ -149,12 +149,23 @@ registerCommand({
     const { message, internalGroupId, internalUserId } = ctx;
     if (!message.chat) return;
 
-    const text = `🛠️ **Debug Info**
+    let groupError = 'None';
+    try {
+      const { groupRepo } = require('../../services/container');
+      await groupRepo.upsert(
+        BigInt(message.chat.id),
+        message.chat.title || 'Unknown Group'
+      );
+    } catch (err: any) {
+      groupError = err.message || err.toString();
+    }
+
+    const text = `🛠 Debug Info
 chat.id: ${message.chat.id}
 chat.type: ${message.chat.type}
-isGroup (expected): ${message.chat.type === 'group' || message.chat.type === 'supergroup'}
 internalGroupId: ${internalGroupId || 'UNDEFINED'}
-internalUserId: ${internalUserId || 'UNDEFINED'}`;
+internalUserId: ${internalUserId || 'UNDEFINED'}
+upsertError: ${groupError}`;
 
     await telegramClient.sendMessage(message.chat.id, text);
   }
@@ -240,7 +251,11 @@ registerCommand({
       return;
     }
     
-    const text = `📊 **Group Stats**\nMessages: ${stats.totalMessages}\nCommands: ${stats.totalCommands}\nWarnings: ${stats.warningsIssued}\nBans: ${stats.bansIssued}`;
+    const text = `📊 Group Stats
+Messages: ${stats.totalMessages}
+Commands: ${stats.totalCommands}
+Warnings: ${stats.warningsIssued}
+Bans: ${stats.bansIssued}`;
     await telegramClient.sendMessage(message.chat.id, text, {
       reply_markup: {
         inline_keyboard: [
@@ -413,7 +428,7 @@ registerCommand({
 
     try {
       await telegramClient.restrictChatMember(message.chat.id, target.id, { can_send_messages: false }, untilDate);
-      await telegramClient.sendMessage(message.chat.id, `🔇 **${target.first_name}** has been muted for 1 hour.\nReason: ${reason}`);
+      await telegramClient.sendMessage(message.chat.id, `🔇 ${target.first_name} has been muted for 1 hour.\nReason: ${reason}`);
       
       const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
       await moderationRepo.createAction({
@@ -459,7 +474,7 @@ registerCommand({
     const reason = (message.text || '').split(' ').slice(1).join(' ') || 'No reason provided';
 
     try {
-      await telegramClient.sendMessage(message.chat.id, `⚠️ **${target.first_name}**, you have been warned.\nReason: ${reason}`);
+      await telegramClient.sendMessage(message.chat.id, `⚠️ ${target.first_name}, you have been warned.\nReason: ${reason}`);
       
       const targetUser = await userRepo.upsert(BigInt(target.id), { firstName: target.first_name, username: target.username });
       await moderationRepo.createAction({
