@@ -1,5 +1,4 @@
 {
-  "$comment": "Vercel Hobby allows max 2 cron jobs, daily frequency only. These two slots run aggregate-metrics and generate-reports; aggregate-metrics chains refresh-health (daily) and prune-data (Sundays) via QStash.",
   "crons": [
     {
       "path": "/api/v1/cron/aggregate-metrics",
